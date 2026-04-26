@@ -7,14 +7,14 @@ const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
 const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
 
 const books = [
-  { title: "A17.1", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
-  { title: "A17.2", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
-  { title: "A17.3", key: "a17-3", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
-  { title: "A17.5", key: "a17-5", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
-  { title: "ANSI A10.4", key: "ansi-a10-4", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
-  { title: "ASME A90.1", key: "asme-a90-1", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
-  { title: "B20.1", key: "b20-1", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
-  { title: "ICC A117.1 ADA", key: "icc-a117-1", path: "./reference-pdfs/national/ICC - A117 -1- 2009 - ADA.pdf", requiresLocalCopy: true },
+  { title: "A17.1", key: "a17-1", linkedLabel: "A17.1 2013", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
+  { title: "A17.2", key: "a17-2", linkedLabel: "A17.2 2014", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
+  { title: "A17.3", key: "a17-3", linkedLabel: "A17.3 2015", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
+  { title: "A17.5", key: "a17-5", linkedLabel: "A17.5 2004", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
+  { title: "ANSI A10.4", key: "ansi-a10-4", linkedLabel: "A10.4 2016", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
+  { title: "ASME A90.1", key: "asme-a90-1", linkedLabel: "A90.1 2009", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
+  { title: "B20.1", key: "b20-1", linkedLabel: "B20.1 2015", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
+  { title: "ICC A117.1 ADA", key: "icc-a117-1", linkedLabel: "A117.1 2009", path: "./reference-pdfs/national/ICC - A117 -1- 2009 - ADA.pdf", requiresLocalCopy: true },
   {
     title: "New York Appendix K",
     key: "ny-appendix-k",
@@ -90,6 +90,10 @@ let questionBankSource = {
   type: "sample",
   label: "Built-in sample questions",
 };
+
+function linkedBookLabel(book) {
+  return book?.linkedLabel || book?.title || "Linked copy";
+}
 
 function getConfig() {
   const config = window.ELEVATOR_EXAM_CONFIG || {};
@@ -795,7 +799,7 @@ async function updateReferenceStatuses() {
       return;
     }
 
-    meta.textContent = linked ? `Opens in Preview: ${linked.fileName}` : "Click to choose PDF, then open in Preview";
+    meta.textContent = linked ? linkedBookLabel(book) : "Click to choose PDF, then open in Preview";
   });
 }
 
@@ -822,14 +826,15 @@ async function renderPreviewBookSetup() {
   container.innerHTML = "";
   requiredBooks.forEach((book) => {
     const linked = linkedBooks[book.key];
+    const label = linkedBookLabel(book);
     const row = document.createElement("div");
     row.className = "book-setup-row";
     row.innerHTML = `
       <div>
         <strong>${book.title}</strong>
-        <span class="book-link-status">${linked ? `Linked for Preview: ${linked.fileName}` : "Not linked yet"}</span>
+        <span class="book-link-status">${linked ? label : "Not linked yet"}</span>
       </div>
-      <button class="btn btn-secondary setup-reference-book" type="button">Link to my copy</button>
+      <button class="btn btn-secondary setup-reference-book" type="button">${linked ? label : "Link to my copy"}</button>
     `;
 
     row.querySelector("button")?.addEventListener("click", async () => {
