@@ -4,7 +4,7 @@ const SAMPLE_ACCOUNT_KEY = "elevator_exam_sample_account_v1";
 const DEFAULT_EXAM_QUESTION_COUNT = 50;
 const DEFAULT_EXAM_DURATION_SECONDS = 10800;
 const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
-const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
+const DEFAULT_SAMPLE_DURATION_SECONDS = 1080;
 
 const books = [
   { title: "A17.1", key: "a17-1", linkedLabel: "A17.1 2013", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
