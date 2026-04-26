@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Viewer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="pdf-modal active">
+      <div class="pdf-modal-window">
+        <div class="pdf-modal-header">
+          <div class="pdf-title-block">
+            <span class="pdf-book-icon" aria-hidden="true">PDF</span>
+            <div>
+              <strong id="pdf-modal-title">PDF Viewer</strong>
+              <span id="pdf-modal-meta" class="pdf-modal-meta">Choose a book to open.</span>
+            </div>
+          </div>
+          <a class="btn btn-ghost" href="./index.html">Back to Exam</a>
+        </div>
+        <div class="pdf-toolbar">
+          <label class="pdf-search" for="pdf-search-input">
+            <span>Keyword Search</span>
+            <input id="pdf-search-input" type="text" placeholder="Enter keyword" />
+          </label>
+          <div class="pdf-toolbar-actions">
+            <div class="pdf-zoom-controls" aria-label="Zoom controls">
+              <button id="pdf-zoom-out" class="btn btn-ghost" type="button">-</button>
+              <span id="pdf-zoom-level" class="pdf-zoom-level">100%</span>
+              <button id="pdf-zoom-in" class="btn btn-ghost" type="button">+</button>
+            </div>
+            <div class="pdf-page-controls" aria-label="Page controls">
+              <button id="pdf-prev-page" class="btn btn-ghost" type="button">Prev</button>
+              <span id="pdf-page-indicator" class="pdf-page-indicator">Page 0 / 0</span>
+              <button id="pdf-next-page" class="btn btn-ghost" type="button">Next</button>
+            </div>
+            <button id="pdf-search-button" class="btn btn-primary" type="button">Search</button>
+          </div>
+        </div>
+        <div id="pdf-search-status" class="pdf-search-status" aria-live="polite"></div>
+        <div class="pdf-frame-shell">
+          <div id="pdf-thumbnails" class="pdf-thumbnails" aria-label="Reference page thumbnails"></div>
+          <div id="pdf-viewport" class="pdf-viewport">
+            <div id="pdf-document" class="pdf-document"></div>
+          </div>
+          <div id="pdf-loading" class="pdf-loading active">Loading reference...</div>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.min.mjs";
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs";
+
+      const params = new URLSearchParams(window.location.search);
+      const src = params.get("src") || "./books/asme-a17-1-2013.pdf";
+      const title = params.get("title") || "PDF Viewer";
+      const elements = {
+        title: document.querySelector("#pdf-modal-title"),
+        meta: document.querySelector("#pdf-modal-meta"),
+        thumbs: document.querySelector("#pdf-thumbnails"),
+        viewport: document.querySelector("#pdf-viewport"),
+        document: document.querySelector("#pdf-document"),
+        loading: document.querySelector("#pdf-loading"),
+        searchInput: document.querySelector("#pdf-search-input"),
+        searchButton: document.querySelector("#pdf-search-button"),
+        searchStatus: document.querySelector("#pdf-search-status"),
+        zoomIn: document.querySelector("#pdf-zoom-in"),
+        zoomOut: document.querySelector("#pdf-zoom-out"),
+        zoomLevel: document.querySelector("#pdf-zoom-level"),
+        prevPage: document.querySelector("#pdf-prev-page"),
+        nextPage: document.querySelector("#pdf-next-page"),
+        pageIndicator: document.querySelector("#pdf-page-indicator")
+      };
+      const state = { pdfDoc: null, pageCount: 0, currentPage: 1, zoom: 1 };
+
+      function setLoading(active, message = "Loading reference...") {
+        elements.loading.textContent = message;
+        elements.loading.classList.toggle("active", active);
+      }
+
+      function updateControls() {
+        elements.title.textContent = title;
+        elements.zoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
+        elements.pageIndicator.textContent = state.pageCount ? `Page ${state.currentPage} / ${state.pageCount}` : "Page 0 / 0";
+      }
+
+      function setActivePage(pageNumber) {
+        state.currentPage = pageNumber;
+        elements.document.querySelectorAll(".pdf-page-sheet").forEach((page) => {
+          page.classList.toggle("active", Number(page.dataset.pageNumber) === pageNumber);
+        });
+        updateControls();
+      }
+
+      function scrollToPage(pageNumber) {
+        const target = elements.document.querySelector(`[data-page-number="${pageNumber}"]`);
+        if (!target) return;
+        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        setActivePage(pageNumber);
+      }
+
+      async function renderDocument() {
+        elements.document.innerHTML = "";
+        elements.thumbs.innerHTML = "";
+        setLoading(true, `Loading ${state.pageCount} pages...`);
+
+        for (let pageNumber = 1; pageNumber <= state.pageCount; pageNumber += 1) {
+          const page = await state.pdfDoc.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: state.zoom });
+          const thumbViewport = page.getViewport({ scale: 0.22 });
+          const sheet = document.createElement("div");
+          const canvas = document.createElement("canvas");
+          const thumb = document.createElement("button");
+          const thumbCanvas = document.createElement("canvas");
+          const label = document.createElement("span");
+
+          sheet.className = "pdf-page-sheet";
+          sheet.dataset.pageNumber = String(pageNumber);
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          sheet.appendChild(canvas);
+
+          thumb.className = "pdf-thumbnail";
+          thumb.type = "button";
+          thumb.dataset.pageNumber = String(pageNumber);
+          thumbCanvas.width = Math.ceil(thumbViewport.width);
+          thumbCanvas.height = Math.ceil(thumbViewport.height);
+          label.className = "pdf-thumbnail-label";
+          label.textContent = `Page ${pageNumber}`;
+          thumb.appendChild(thumbCanvas);
+          thumb.appendChild(label);
+          thumb.addEventListener("click", () => scrollToPage(pageNumber));
+
+          elements.document.appendChild(sheet);
+          elements.thumbs.appendChild(thumb);
+          await page.render({ canvasContext: thumbCanvas.getContext("2d"), viewport: thumbViewport }).promise;
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+        }
+
+        setActivePage(1);
+        setLoading(false);
+      }
+
+      async function loadDocument() {
+        try {
+          const task = pdfjsLib.getDocument(src);
+          state.pdfDoc = await task.promise;
+          state.pageCount = state.pdfDoc.numPages;
+          elements.meta.textContent = `${state.pageCount} pages`;
+          updateControls();
+          await renderDocument();
+        } catch (error) {
+          elements.meta.textContent = "Unable to load document";
+          setLoading(true, "This PDF could not be loaded.");
+        }
+      }
+
+      async function searchDocument() {
+        const keyword = elements.searchInput.value.trim().toLowerCase();
+        if (!keyword || !state.pdfDoc) return;
+        setLoading(true, `Searching for "${keyword}"...`);
+        for (let pageNumber = 1; pageNumber <= state.pageCount; pageNumber += 1) {
+          const page = await state.pdfDoc.getPage(pageNumber);
+          const text = await page.getTextContent();
+          const pageText = text.items.map((item) => item.str).join(" ").toLowerCase();
+          if (pageText.includes(keyword)) {
+            elements.searchStatus.textContent = `Match found on page ${pageNumber}.`;
+            scrollToPage(pageNumber);
+            setLoading(false);
+            return;
+          }
+        }
+        elements.searchStatus.textContent = "No matches found.";
+        setLoading(false);
+      }
+
+      elements.zoomIn.addEventListener("click", () => {
+        state.zoom = Math.min(2, Number((state.zoom + 0.1).toFixed(2)));
+        renderDocument();
+      });
+      elements.zoomOut.addEventListener("click", () => {
+        state.zoom = Math.max(0.75, Number((state.zoom - 0.1).toFixed(2)));
+        renderDocument();
+      });
+      elements.prevPage.addEventListener("click", () => scrollToPage(Math.max(1, state.currentPage - 1)));
+      elements.nextPage.addEventListener("click", () => scrollToPage(Math.min(state.pageCount, state.currentPage + 1)));
+      elements.searchButton.addEventListener("click", searchDocument);
+      elements.searchInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") searchDocument();
+      });
+
+      loadDocument();
+    </script>
+  </body>
+</html>
