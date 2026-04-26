@@ -1,103 +1,426 @@
-import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.min.mjs";
-import { questionBank } from "./questions.js";
+const STORAGE_KEY = "elevator_exam_state_v1";
+const QUESTION_BANK_CACHE_KEY = "elevator_exam_question_bank_v1";
+const SAMPLE_ACCOUNT_KEY = "elevator_exam_sample_account_v1";
+const DEFAULT_EXAM_QUESTION_COUNT = 50;
+const DEFAULT_EXAM_DURATION_SECONDS = 10800;
+const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
+const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs";
+const books = [
+  { title: "A17.1", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
+  { title: "A17.2", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
+  { title: "A17.3", key: "a17-3", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
+  { title: "A17.5", key: "a17-5", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
+  { title: "ANSI A10.4", key: "ansi-a10-4", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
+  { title: "ASME A90.1", key: "asme-a90-1", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
+  { title: "B20.1", key: "b20-1", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
+  { title: "ICC A117.1 ADA", key: "icc-a117-1", path: "./reference-pdfs/national/ICC - A117 -1- 2009 - ADA.pdf", requiresLocalCopy: true },
+  {
+    title: "New York Appendix K",
+    key: "ny-appendix-k",
+    path: "https://www.nyc.gov/assets/buildings/building_code/update_63_combined_instructions.pdf",
+    online: true,
+  },
+  {
+    title: "NYC Chapter 33",
+    key: "nyc-chapter-33",
+    path: "https://www.nyc.gov/assets/buildings/codes-pdf/cons_codes_2022/2022BC_Chapter33_Con_DemoSafetyWBwm.pdf",
+    online: true,
+  },
+  {
+    title: "NYC Electrical Code",
+    key: "nyc-electrical-code",
+    path: "https://www.nyc.gov/assets/buildings/pdf/admin_sec_2007_elec_code.pdf",
+    online: true,
+  },
+];
 
-const screens = {
-  welcome: document.querySelector("#welcome-screen"),
-  exam: document.querySelector("#exam-screen"),
-  review: document.querySelector("#review-screen"),
-  results: document.querySelector("#results-screen")
+const SAMPLE_QUESTIONS = [
+  {
+    id: 1,
+    text: "According to ASME A17.1, what is the minimum clear height required in an elevator machine room?",
+    options: ["A) 6 ft 6 in", "B) 7 ft 0 in", "C) 7 ft 6 in", "D) 8 ft 0 in"],
+    correct: "C",
+  },
+  {
+    id: 2,
+    text: "The working clearance in front of electrical equipment operating at 600V or less shall be at least:",
+    options: ["A) 30 inches", "B) 36 inches", "C) 42 inches", "D) 48 inches"],
+    correct: "B",
+  },
+  {
+    id: 3,
+    text: "In NYC Building Code, elevator hoistway doors must comply with which section?",
+    options: ["A) BC 3000", "B) BC 3010", "C) BC 2800", "D) BC 2600"],
+    correct: "B",
+  },
+  {
+    id: 4,
+    text: "What does A17.2 primarily cover?",
+    options: [
+      "A) Safety Code for Elevators",
+      "B) Guide for Inspection of Elevators",
+      "C) Performance-Based Safety Code",
+      "D) Elevator Electrical Equipment",
+    ],
+    correct: "B",
+  },
+  {
+    id: 5,
+    text: "NEC Article 620 covers:",
+    options: [
+      "A) Elevators, Dumbwaiters, Escalators",
+      "B) Fire Alarm Systems",
+      "C) Emergency Lighting",
+      "D) Hazardous Locations",
+    ],
+    correct: "A",
+  },
+  ...Array.from({ length: 45 }, (_, i) => ({
+    id: i + 6,
+    text: `Question ${i + 6}: Sample realistic question related to elevator safety, electrical requirements, or NYC code provisions.`,
+    options: ["A) Option A", "B) Option B", "C) Option C", "D) Option D"],
+    correct: "B",
+  })),
+];
+
+let currentBook = null;
+let questionBank = [...SAMPLE_QUESTIONS];
+let questionBankSource = {
+  type: "sample",
+  label: "Built-in sample questions",
 };
 
-const elements = {
-  landingScreen: document.querySelector("#landing-screen"),
-  examShell: document.querySelector("#exam-shell"),
-  enterExam: document.querySelector("#enter-exam"),
-  timer: document.querySelector("#timer"),
-  pauseExam: document.querySelector("#pause-exam"),
-  pauseOverlay: document.querySelector("#pause-overlay"),
-  resumeExam: document.querySelector("#resume-exam"),
-  referenceLinks: document.querySelectorAll(".reference-link"),
-  pdfModal: document.querySelector("#pdf-modal"),
-  pdfModalTitle: document.querySelector("#pdf-modal-title"),
-  pdfModalMeta: document.querySelector("#pdf-modal-meta"),
-  pdfThumbnails: document.querySelector("#pdf-thumbnails"),
-  pdfViewport: document.querySelector("#pdf-viewport"),
-  pdfDocument: document.querySelector("#pdf-document"),
-  pdfLoading: document.querySelector("#pdf-loading"),
-  pdfSearchInput: document.querySelector("#pdf-search-input"),
-  pdfSearchButton: document.querySelector("#pdf-search-button"),
-  pdfSearchStatus: document.querySelector("#pdf-search-status"),
-  pdfZoomIn: document.querySelector("#pdf-zoom-in"),
-  pdfZoomOut: document.querySelector("#pdf-zoom-out"),
-  pdfZoomLevel: document.querySelector("#pdf-zoom-level"),
-  pdfPrevPage: document.querySelector("#pdf-prev-page"),
-  pdfNextPage: document.querySelector("#pdf-next-page"),
-  pdfPageIndicator: document.querySelector("#pdf-page-indicator"),
-  closePdfModal: document.querySelector("#close-pdf-modal"),
-  questionPrompt: document.querySelector("#question-prompt"),
-  answerOptions: document.querySelector("#answer-options"),
-  reviewSummary: document.querySelector("#review-summary"),
-  reviewList: document.querySelector("#review-list"),
-  categoryBreakdown: document.querySelector("#category-breakdown"),
-  resultsList: document.querySelector("#results-list"),
-  scoreHeading: document.querySelector("#score-heading"),
-  scoreSummary: document.querySelector("#score-summary"),
-  scorePercent: document.querySelector("#score-percent"),
-  scoreCorrect: document.querySelector("#score-correct"),
-  scoreFlagged: document.querySelector("#score-flagged"),
-  scoreTime: document.querySelector("#score-time"),
-  prevQuestion: document.querySelector("#prev-question"),
-  nextQuestion: document.querySelector("#next-question"),
-  flagQuestion: document.querySelector("#flag-question"),
-  markReview: document.querySelector("#mark-review"),
-  submitExam: document.querySelector("#submit-exam")
-};
+function getConfig() {
+  const config = window.ELEVATOR_EXAM_CONFIG || {};
+  const fullQuestionCount = Number(config.fullQuestionCount || config.questionCount);
+  const fullDurationMinutes = Number(config.fullDurationMinutes);
+  const sampleQuestionCount = Number(config.sampleQuestionCount);
+  const sampleDurationMinutes = Number(config.sampleDurationMinutes);
 
-const EXAM_CONFIG = {
-  count: 25,
-  durationMinutes: 180,
-  shuffleQuestions: true,
-  showExplanations: true
-};
-
-const state = {
-  questions: [],
-  currentIndex: 0,
-  startedAt: null,
-  durationSeconds: 0,
-  remainingSeconds: 0,
-  timerId: null,
-  paused: false,
-  completed: false,
-  showExplanations: true,
-  pdfZoom: 1,
-  pdfDoc: null,
-  pdfCurrentPage: 1,
-  pdfPageCount: 0,
-  pdfMatches: [],
-  pdfScrollSyncLocked: false
-};
-
-function shuffleArray(items) {
-  const clone = [...items];
-
-  for (let index = clone.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [clone[index], clone[swapIndex]] = [clone[swapIndex], clone[index]];
-  }
-
-  return clone;
+  return {
+    questionSheetUrl: String(config.questionSheetUrl || "").trim(),
+    localQuestionBankUrl: String(config.localQuestionBankUrl || "./question-bank-1000.csv").trim(),
+    fullQuestionCount: fullQuestionCount > 0 ? fullQuestionCount : DEFAULT_EXAM_QUESTION_COUNT,
+    fullDurationSeconds: fullDurationMinutes > 0 ? fullDurationMinutes * 60 : DEFAULT_EXAM_DURATION_SECONDS,
+    sampleQuestionCount: sampleQuestionCount > 0 ? sampleQuestionCount : DEFAULT_SAMPLE_QUESTION_COUNT,
+    sampleDurationSeconds: sampleDurationMinutes > 0 ? sampleDurationMinutes * 60 : DEFAULT_SAMPLE_DURATION_SECONDS,
+    sourceBlueprint: Array.isArray(config.sourceBlueprint) ? config.sourceBlueprint : [],
+  };
 }
 
-function showScreen(key) {
-  Object.entries(screens).forEach(([name, screen]) => {
-    screen.classList.toggle("active", name === key);
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function saveSampleAccount(email) {
+  const account = {
+    email: String(email || "").trim().toLowerCase(),
+    createdAt: Date.now(),
+  };
+  localStorage.setItem(SAMPLE_ACCOUNT_KEY, JSON.stringify(account));
+  return account;
+}
+
+function loadSampleAccount() {
+  try {
+    const raw = localStorage.getItem(SAMPLE_ACCOUNT_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed?.email ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchLinkedBooks() {
+  try {
+    const response = await fetch("/linked-books", { cache: "no-store" });
+    if (!response.ok) {
+      return {};
+    }
+
+    return response.json();
+  } catch {
+    return {};
+  }
+}
+
+async function linkReferenceBook(book) {
+  const response = await fetch("/link-book", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      key: book.key,
+      title: book.title,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}));
+    throw new Error(detail.error || `Unable to link ${book.title}`);
+  }
+
+  return response.json();
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"' && inQuotes && nextChar === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current);
+  return values.map((value) => value.trim());
+}
+
+function parseCsv(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter((line) => line.trim().length);
+  if (!lines.length) {
+    return [];
+  }
+
+  const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase().trim());
+  return lines.slice(1).map((line) => {
+    const cells = parseCsvLine(line);
+    return headers.reduce((row, header, index) => {
+      row[header] = cells[index] || "";
+      return row;
+    }, {});
   });
 }
 
-function formatClock(totalSeconds) {
+function normalizeQuestionSourceUrl(url) {
+  if (!url) {
+    return "";
+  }
+
+  if (url.includes("/pub?output=csv") || url.includes("/pubhtml")) {
+    return url.replace("/pubhtml", "/pub?output=csv").replace(/\?.*$/, "?output=csv");
+  }
+
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) {
+    return url;
+  }
+
+  const sheetId = match[1];
+  const gidMatch = url.match(/[?&]gid=([0-9]+)/);
+  const gid = gidMatch ? gidMatch[1] : "0";
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+}
+
+function normalizeQuestionRow(row, index) {
+  const options = [row.option_a, row.option_b, row.option_c, row.option_d]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const correct = String(row.correct || "").trim().toUpperCase();
+  const text = String(row.text || row.question || "").trim();
+
+  if (!text || options.length < 2 || !["A", "B", "C", "D"].includes(correct)) {
+    return null;
+  }
+
+  const normalizedOptions = options.map((option, optionIndex) => {
+    const prefix = `${String.fromCharCode(65 + optionIndex)}) `;
+    return option.startsWith(prefix) ? option : `${prefix}${option}`;
+  });
+
+  return {
+    id: Number(row.id) || index + 1,
+    text,
+    options: normalizedOptions,
+    correct,
+    source: String(row.source || row.book || "").trim(),
+    topic: String(row.topic || row.category || "").trim(),
+    reference: String(row.reference || row.ref || "").trim(),
+    section: String(row.section || row.code_section || row.part || "").trim(),
+    page: String(row.page || row.page_number || "").trim(),
+    location: String(row.location || row.answer_location || "").trim(),
+    explanation: String(row.explanation || row.rationale || row.why || "").trim(),
+    type: String(row.type || row.question_type || "multiple_choice").trim(),
+  };
+}
+
+function cleanQuestionText(text) {
+  return String(text || "")
+    .replace(/^question\s+\d+\s*:\s*/i, "")
+    .trim();
+}
+
+function loadCachedQuestionBank() {
+  try {
+    const raw = localStorage.getItem(QUESTION_BANK_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheQuestionBank(bank) {
+  try {
+    localStorage.setItem(QUESTION_BANK_CACHE_KEY, JSON.stringify(bank));
+  } catch {
+    // Ignore cache write failures and continue with in-memory data.
+  }
+}
+
+async function loadQuestionBank() {
+  const { questionSheetUrl, localQuestionBankUrl } = getConfig();
+  const cachedQuestionBank = loadCachedQuestionBank();
+  const fallback = cachedQuestionBank || [...SAMPLE_QUESTIONS];
+
+  async function loadCsvQuestionSource(url) {
+    const response = await fetch(normalizeQuestionSourceUrl(url), { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Question source request failed with ${response.status}`);
+    }
+
+    const csvText = await response.text();
+    const parsedRows = parseCsv(csvText);
+    const loadedQuestions = parsedRows
+      .map((row, index) => normalizeQuestionRow(row, index))
+      .filter(Boolean);
+
+    if (!loadedQuestions.length) {
+      throw new Error("Question source returned no valid questions");
+    }
+
+    return loadedQuestions;
+  }
+
+  try {
+    if (questionSheetUrl) {
+      const loadedQuestions = await loadCsvQuestionSource(questionSheetUrl);
+      questionBank = loadedQuestions;
+      questionBankSource = {
+        type: "google-sheet",
+        label: `Live Google Sheet (${loadedQuestions.length} questions)`,
+      };
+      cacheQuestionBank(loadedQuestions);
+      return questionBank;
+    }
+  } catch (error) {
+    // Fall through to the local CSV bank when the Google Sheet is private, offline, or blocked.
+  }
+
+  try {
+    const loadedQuestions = await loadCsvQuestionSource(localQuestionBankUrl);
+    questionBank = loadedQuestions;
+    questionBankSource = {
+      type: "local-csv",
+      label: `Local CSV fallback (${loadedQuestions.length} questions)`,
+    };
+    cacheQuestionBank(loadedQuestions);
+    return questionBank;
+  } catch (error) {
+    questionBank = fallback;
+    questionBankSource = cachedQuestionBank
+      ? {
+          type: "cached",
+          label: `Cached question bank (${cachedQuestionBank.length} questions)`,
+        }
+      : {
+          type: "sample",
+          label: "Built-in sample questions",
+        };
+    return questionBank;
+  }
+}
+
+function getActiveQuestions(state = loadState()) {
+  if (Array.isArray(state.examQuestions) && state.examQuestions.length) {
+    return state.examQuestions;
+  }
+
+  return questionBank;
+}
+
+function shuffleArray(items) {
+  const shuffled = [...items];
+
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const randomIndex = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
+  }
+
+  return shuffled;
+}
+
+function normalizeMatchValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function questionMatchesBlueprint(question, rule) {
+  const questionSource = normalizeMatchValue(question.source);
+  const questionTopic = normalizeMatchValue(question.topic);
+  const sourceMatch = normalizeMatchValue(rule.sourceMatch);
+  const topicMatch = normalizeMatchValue(rule.topicMatch);
+
+  const sourceOk = !sourceMatch || questionSource.includes(sourceMatch);
+  const topicOk = !topicMatch || questionTopic.includes(topicMatch);
+  return sourceOk && topicOk;
+}
+
+function selectQuestionsFromBlueprint(bank, questionCount, sourceBlueprint) {
+  if (!sourceBlueprint.length) {
+    return shuffleArray(bank).slice(0, Math.min(questionCount, bank.length));
+  }
+
+  const selected = [];
+  const usedIds = new Set();
+
+  sourceBlueprint.forEach((rule) => {
+    const targetCount = Math.max(0, Number(rule.count) || 0);
+    if (!targetCount) {
+      return;
+    }
+
+    const matchingQuestions = shuffleArray(
+      bank.filter((question) => !usedIds.has(question.id) && questionMatchesBlueprint(question, rule))
+    ).slice(0, targetCount);
+
+    matchingQuestions.forEach((question) => {
+      selected.push(question);
+      usedIds.add(question.id);
+    });
+  });
+
+  if (selected.length < questionCount) {
+    const leftovers = shuffleArray(bank.filter((question) => !usedIds.has(question.id)));
+    selected.push(...leftovers.slice(0, questionCount - selected.length));
+  }
+
+  return shuffleArray(selected).slice(0, Math.min(questionCount, bank.length));
+}
+
+function formatTime(totalSeconds) {
   const seconds = Math.max(0, totalSeconds);
   const hours = String(Math.floor(seconds / 3600)).padStart(2, "0");
   const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
@@ -105,549 +428,691 @@ function formatClock(totalSeconds) {
   return `${hours}:${minutes}:${leftover}`;
 }
 
-function formatUsedTime() {
-  const used = state.durationSeconds - state.remainingSeconds;
-  return formatClock(used);
+function defaultState() {
+  return {
+    startedAt: null,
+    endsAt: null,
+    mode: "full",
+    questionCount: DEFAULT_EXAM_QUESTION_COUNT,
+    durationSeconds: DEFAULT_EXAM_DURATION_SECONDS,
+    accountEmail: null,
+    currentQ: 0,
+    examQuestions: [],
+    userAnswers: {},
+    reviewMarks: {},
+    submitted: false,
+    score: null,
+    submittedAt: null,
+    expired: false,
+  };
 }
 
-function buildExamSet({ count, durationMinutes }) {
-  const base = EXAM_CONFIG.shuffleQuestions ? shuffleArray(questionBank) : [...questionBank];
-  const selected = base.slice(0, Math.min(count, questionBank.length)).map((question) => {
-    const choiceObjects = question.choices.map((choice, index) => ({
-      text: choice,
-      originalIndex: index
-    }));
-    const choices = EXAM_CONFIG.shuffleQuestions ? shuffleArray(choiceObjects) : choiceObjects;
-    const answer = choices.findIndex((choice) => choice.originalIndex === question.answer);
-
-    return {
-      ...question,
-      choices: choices.map((choice) => choice.text),
-      answer,
-      userAnswer: null,
-      flagged: false,
-      seen: false
-    };
-  });
-
-  state.questions = selected;
-  state.currentIndex = 0;
-  state.durationSeconds = durationMinutes * 60;
-  state.remainingSeconds = durationMinutes * 60;
-  state.startedAt = Date.now();
-  state.completed = false;
-  state.paused = false;
-  state.showExplanations = EXAM_CONFIG.showExplanations;
-}
-
-function startTimer() {
-  stopTimer();
-  state.timerId = window.setInterval(() => {
-    if (state.paused || state.completed) return;
-
-    state.remainingSeconds -= 1;
-    elements.timer.textContent = formatClock(state.remainingSeconds);
-
-    if (state.remainingSeconds <= 0) {
-      state.remainingSeconds = 0;
-      stopTimer();
-      renderReviewScreen();
-      showScreen("review");
-    }
-  }, 1000);
-}
-
-function stopTimer() {
-  if (state.timerId) {
-    window.clearInterval(state.timerId);
-    state.timerId = null;
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? { ...defaultState(), ...JSON.parse(raw) } : defaultState();
+  } catch {
+    return defaultState();
   }
 }
 
-function renderQuestion() {
-  const question = state.questions[state.currentIndex];
-  question.seen = true;
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 
-  elements.timer.textContent = formatClock(state.remainingSeconds);
-  elements.questionPrompt.textContent = question.prompt;
-  elements.flagQuestion.textContent = question.flagged ? "Unflag Question" : "Flag For Review";
-  elements.answerOptions.innerHTML = "";
+function resetState() {
+  const state = defaultState();
+  saveState(state);
+  return state;
+}
 
-  question.choices.forEach((choice, choiceIndex) => {
-    const button = document.createElement("button");
-    button.className = "answer-card";
-    button.innerHTML = `
-      <span class="answer-letter">${String.fromCharCode(65 + choiceIndex)}</span>
-      <span>${choice}</span>
-    `;
+function calculateRemainingSeconds(state) {
+  if (!state.endsAt || state.submitted) {
+    return state.durationSeconds || DEFAULT_EXAM_DURATION_SECONDS;
+  }
 
-    if (question.userAnswer === choiceIndex) button.classList.add("selected");
+  return Math.max(0, Math.floor((state.endsAt - Date.now()) / 1000));
+}
 
-    button.addEventListener("click", () => {
-      question.userAnswer = choiceIndex;
-      renderQuestion();
-    });
-
-    elements.answerOptions.appendChild(button);
+function calculateScore(state) {
+  let score = 0;
+  const activeQuestions = getActiveQuestions(state);
+  const pointsPerQuestion = activeQuestions.length ? 100 / activeQuestions.length : 0;
+  activeQuestions.forEach((question) => {
+    if (state.userAnswers[question.id] === question.correct) {
+      score += pointsPerQuestion;
+    }
   });
-
-  elements.prevQuestion.disabled = state.currentIndex === 0;
-  elements.nextQuestion.textContent = state.currentIndex === state.questions.length - 1 ? "Review Exam" : "Next";
+  return Math.round(score);
 }
 
-function reviewCounts() {
-  const answered = state.questions.filter((question) => question.userAnswer !== null).length;
-  const flagged = state.questions.filter((question) => question.flagged).length;
-  const unanswered = state.questions.length - answered;
-  return { answered, flagged, unanswered };
+function getUnansweredQuestions(state) {
+  return getActiveQuestions(state).filter((question) => !state.userAnswers[question.id]);
 }
 
-function renderReviewScreen() {
-  const counts = reviewCounts();
-  elements.reviewSummary.innerHTML = `
-    <div class="review-item">
-      <div>
-        <h3>Exam Snapshot</h3>
-        <p class="muted">Check unanswered or flagged items before submitting.</p>
-      </div>
-      <div class="review-badges">
-        <span class="badge">${counts.answered} answered</span>
-        <span class="badge ${counts.unanswered ? "warn" : "good"}">${counts.unanswered} unanswered</span>
-        <span class="badge ${counts.flagged ? "warn" : "good"}">${counts.flagged} flagged</span>
-      </div>
+function getQuestionDisplayNumber(state, question) {
+  return getActiveQuestions(state).findIndex((item) => item.id === question.id) + 1;
+}
+
+function formatAnswerText(question, answerLetter) {
+  if (!answerLetter) {
+    return "No answer selected";
+  }
+
+  const optionIndex = answerLetter.charCodeAt(0) - 65;
+  return question.options[optionIndex] || answerLetter;
+}
+
+function buildAnswerReference(question) {
+  const details = [
+    question.reference || question.source,
+    question.section ? `Section: ${question.section}` : "",
+    question.page ? `Page: ${question.page}` : "",
+    question.location || question.topic,
+  ].filter(Boolean);
+
+  return details.length ? details.join(" • ") : "No answer location is listed in the question bank yet.";
+}
+
+function showIncompleteSubmitWarning(state) {
+  const unanswered = getUnansweredQuestions(state);
+
+  if (!unanswered.length) {
+    return false;
+  }
+
+  const unansweredList = unanswered
+    .map((question) => `Question ${getQuestionDisplayNumber(state, question)}`)
+    .join(", ");
+  const warning = document.getElementById("submit-warning");
+
+  if (warning) {
+    warning.hidden = false;
+    warning.innerHTML = `
+      <strong>This test is not complete.</strong>
+      <span>You have ${unanswered.length} unanswered question${unanswered.length === 1 ? "" : "s"}: ${unansweredList}.</span>
+      <a href="./review.html">Go to review</a>
+    `;
+    warning.scrollIntoView({ block: "nearest" });
+  }
+
+  return true;
+}
+
+async function startNewExam({ mode = "full", accountEmail = null } = {}) {
+  await loadQuestionBank();
+  const startedAt = Date.now();
+  const config = getConfig();
+  const isSample = mode === "sample";
+  const questionCount = isSample ? config.sampleQuestionCount : config.fullQuestionCount;
+  const durationSeconds = isSample ? config.sampleDurationSeconds : config.fullDurationSeconds;
+  const sourceBlueprint = isSample ? [] : config.sourceBlueprint;
+  const selectedQuestions = selectQuestionsFromBlueprint(questionBank, questionCount, sourceBlueprint);
+  const state = {
+    startedAt,
+    endsAt: startedAt + durationSeconds * 1000,
+    mode: isSample ? "sample" : "full",
+    questionCount,
+    durationSeconds,
+    accountEmail,
+    currentQ: 0,
+    examQuestions: selectedQuestions,
+    userAnswers: {},
+    reviewMarks: {},
+    submitted: false,
+    score: null,
+    submittedAt: null,
+    expired: false,
+  };
+  saveState(state);
+  window.location.href = "./exam.html";
+}
+
+function submitExam({ expired = false } = {}) {
+  const state = loadState();
+  if (!expired && showIncompleteSubmitWarning(state)) {
+    return;
+  }
+
+  state.submitted = true;
+  state.expired = expired;
+  state.submittedAt = Date.now();
+  state.score = calculateScore(state);
+  saveState(state);
+  window.location.href = "./results.html";
+}
+
+function ensureExamState() {
+  const state = loadState();
+  if (!state.startedAt || state.submitted) {
+    window.location.href = "./start.html";
+    return null;
+  }
+  return state;
+}
+
+function renderQuestion(state) {
+  const activeQuestions = getActiveQuestions(state);
+  const question = activeQuestions[state.currentQ];
+  const qNumber = document.getElementById("q-number");
+  const currentQuestion = document.getElementById("current-question");
+  const reviewStatus = document.getElementById("review-status");
+  const totalQuestions = document.getElementById("total-questions");
+  const nextButton = document.getElementById("next-question");
+
+  if (!question || !qNumber || !currentQuestion) {
+    return;
+  }
+
+  qNumber.textContent = String(state.currentQ + 1);
+  if (totalQuestions) {
+    totalQuestions.textContent = String(activeQuestions.length);
+  }
+  if (reviewStatus) {
+    const pointsPerQuestion = activeQuestions.length ? Math.round(100 / activeQuestions.length) : 0;
+    reviewStatus.textContent = state.reviewMarks[question.id] ? "Marked for review" : `${pointsPerQuestion} points each`;
+  }
+  if (nextButton) {
+    nextButton.textContent = state.currentQ >= activeQuestions.length - 1 ? "Exam Complete" : "Next";
+  }
+
+  currentQuestion.innerHTML = `
+    <p class="text-xl">${cleanQuestionText(question.text)}</p>
+    <div class="answer-list">
+      ${question.options
+        .map((option, index) => {
+          const letter = String.fromCharCode(65 + index);
+          const checked = state.userAnswers[question.id] === letter ? "checked" : "";
+          return `
+            <label class="answer-option">
+              <input type="radio" name="question-${question.id}" value="${letter}" ${checked}>
+              <span>${option}</span>
+            </label>
+          `;
+        })
+        .join("")}
     </div>
   `;
-  elements.reviewList.innerHTML = "";
 
-  state.questions.forEach((question, index) => {
-    const row = document.createElement("div");
-    row.className = "review-item";
-    const badges = [
-      question.userAnswer !== null ? '<span class="badge good">Answered</span>' : '<span class="badge warn">Unanswered</span>'
-    ];
+  currentQuestion.querySelectorAll("input[type='radio']").forEach((input) => {
+    input.addEventListener("change", () => {
+      const nextState = loadState();
+      nextState.userAnswers[question.id] = input.value;
+      delete nextState.reviewMarks[question.id];
+      saveState(nextState);
+      renderQuestion(nextState);
+      renderReviewMap(nextState);
+    });
+  });
+}
 
-    if (question.flagged) badges.push('<span class="badge warn">Flagged</span>');
+function buildAnswerOptions(question, selectedAnswer) {
+  return `
+    <div class="answer-list">
+      ${question.options
+        .map((option, index) => {
+          const letter = String.fromCharCode(65 + index);
+          const checked = selectedAnswer === letter ? "checked" : "";
+          return `
+            <label class="answer-option">
+              <input type="radio" name="question-${question.id}" value="${letter}" ${checked}>
+              <span>${option}</span>
+            </label>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
 
-    row.innerHTML = `
-      <div>
-        <strong>Question ${index + 1}</strong>
-        <p class="muted">${question.prompt}</p>
+function getReviewQuestions(state) {
+  return getActiveQuestions(state).filter((question) => !state.userAnswers[question.id] || state.reviewMarks[question.id]);
+}
+
+function renderReviewListPage(state) {
+  const container = document.getElementById("review-list-page");
+
+  if (!container) {
+    return;
+  }
+
+  const reviewQuestions = getReviewQuestions(state);
+  container.innerHTML = "";
+
+  if (!reviewQuestions.length) {
+    container.innerHTML = `
+      <div class="review-empty">
+        <p class="eyebrow">Review Complete</p>
+        <p class="muted">There are no unanswered or marked questions left.</p>
       </div>
-      <div class="review-badges">${badges.join("")}</div>
     `;
-    row.addEventListener("click", () => {
-      state.currentIndex = index;
-      renderQuestion();
-      showScreen("exam");
-    });
-    elements.reviewList.appendChild(row);
-  });
-}
+    return;
+  }
 
-function buildCategoryBreakdown() {
-  const categories = new Map();
+  reviewQuestions.forEach((question) => {
+    const card = document.createElement("section");
+    card.className = "review-question-card";
+    const needsReview = !!state.reviewMarks[question.id];
+    const answered = !!state.userAnswers[question.id];
+    const displayNumber = getActiveQuestions(state).findIndex((item) => item.id === question.id) + 1;
 
-  state.questions.forEach((question) => {
-    if (!categories.has(question.category)) categories.set(question.category, { total: 0, correct: 0 });
-
-    const bucket = categories.get(question.category);
-    bucket.total += 1;
-    if (question.userAnswer === question.answer) bucket.correct += 1;
-  });
-
-  elements.categoryBreakdown.innerHTML = "";
-  [...categories.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .forEach(([category, bucket]) => {
-      const percent = Math.round((bucket.correct / bucket.total) * 100);
-      const card = document.createElement("div");
-      card.className = "category-card";
-      card.innerHTML = `
-        <h4>${category}</h4>
-        <p class="muted">${bucket.correct} of ${bucket.total} correct</p>
-        <strong>${percent}%</strong>
-      `;
-      elements.categoryBreakdown.appendChild(card);
-    });
-}
-
-function renderResults() {
-  state.completed = true;
-  stopTimer();
-
-  const correct = state.questions.filter((question) => question.userAnswer === question.answer).length;
-  const percent = Math.round((correct / state.questions.length) * 100);
-  const flagged = state.questions.filter((question) => question.flagged).length;
-  const unanswered = state.questions.filter((question) => question.userAnswer === null).length;
-
-  elements.scoreHeading.textContent = percent >= 70 ? "Practice exam completed" : "Practice exam needs review";
-  elements.scoreSummary.textContent =
-    unanswered > 0
-      ? `You left ${unanswered} question${unanswered === 1 ? "" : "s"} unanswered. Review those weak spots and try another run.`
-      : "You completed every question. Review category performance to target your next study block.";
-  elements.scorePercent.textContent = `${percent}%`;
-  elements.scoreCorrect.textContent = `${correct} / ${state.questions.length}`;
-  elements.scoreFlagged.textContent = String(flagged);
-  elements.scoreTime.textContent = formatUsedTime();
-
-  buildCategoryBreakdown();
-  elements.resultsList.innerHTML = "";
-
-  state.questions.forEach((question, index) => {
-    const isCorrect = question.userAnswer === question.answer;
-    const userLabel =
-      question.userAnswer === null
-        ? "No answer"
-        : `${String.fromCharCode(65 + question.userAnswer)}. ${question.choices[question.userAnswer]}`;
-    const correctLabel = `${String.fromCharCode(65 + question.answer)}. ${question.choices[question.answer]}`;
-    const card = document.createElement("article");
-    card.className = "result-card";
     card.innerHTML = `
-      <div class="result-meta">
-        <span class="badge">${question.category}</span>
-        <span class="badge ${isCorrect ? "good" : "warn"}">${isCorrect ? "Correct" : "Needs review"}</span>
+      <div class="question-meta">
+        <div>
+          <span class="muted">Question</span>
+          <strong style="font-size: 1.8rem; margin-left: 8px;">${displayNumber}</strong>
+        </div>
+        <div class="muted">${needsReview ? "Marked for review" : answered ? "Answered" : "Unanswered"}</div>
       </div>
-      <h4>Question ${index + 1}</h4>
-      <p>${question.prompt}</p>
-      <p><strong>Your answer:</strong> ${userLabel}</p>
-      <p><strong>Correct answer:</strong> ${correctLabel}</p>
-      ${state.showExplanations ? `<div class="explanation"><strong>Why:</strong> ${question.explanation}</div>` : ""}
+      <h3>${cleanQuestionText(question.text)}</h3>
+      ${buildAnswerOptions(question, state.userAnswers[question.id])}
     `;
-    elements.resultsList.appendChild(card);
-  });
 
-  showScreen("results");
-}
+    card.querySelectorAll("input[type='radio']").forEach((input) => {
+      input.addEventListener("change", () => {
+        const nextState = loadState();
+        nextState.userAnswers[question.id] = input.value;
+        delete nextState.reviewMarks[question.id];
+        saveState(nextState);
+        renderReviewListPage(nextState);
+      });
+    });
 
-function resetExam() {
-  stopTimer();
-  state.questions = [];
-  state.currentIndex = 0;
-  state.startedAt = null;
-  state.durationSeconds = 0;
-  state.remainingSeconds = 0;
-  state.paused = false;
-  state.completed = false;
-  elements.timer.textContent = "03:00:00";
-  elements.pauseExam.textContent = "Pause Exam";
-  elements.pauseOverlay.classList.remove("active");
-  elements.pauseOverlay.setAttribute("aria-hidden", "true");
-  elements.reviewSummary.innerHTML = "";
-  elements.reviewList.innerHTML = "";
-  elements.categoryBreakdown.innerHTML = "";
-  elements.resultsList.innerHTML = "";
-  showScreen("exam");
-}
-
-function enterExamWorkspace() {
-  elements.landingScreen.classList.remove("active");
-  elements.examShell.classList.remove("hidden");
-  startExam({
-    count: EXAM_CONFIG.count,
-    durationMinutes: EXAM_CONFIG.durationMinutes
+    container.appendChild(card);
   });
 }
 
-window.startExamApp = enterExamWorkspace;
+function markCurrentQuestionForReview() {
+  const state = loadState();
+  const question = getActiveQuestions(state)[state.currentQ];
 
-function startExam({ count, durationMinutes }) {
-  buildExamSet({ count, durationMinutes });
-  renderQuestion();
-  startTimer();
-  showScreen("exam");
-}
-
-function setPdfLoading(isLoading, message = "Loading reference...") {
-  elements.pdfLoading.textContent = message;
-  elements.pdfLoading.classList.toggle("active", isLoading);
-}
-
-function updatePdfControls() {
-  elements.pdfZoomLevel.textContent = `${Math.round(state.pdfZoom * 100)}%`;
-  elements.pdfPageIndicator.textContent = state.pdfPageCount ? `Page ${state.pdfCurrentPage} / ${state.pdfPageCount}` : "Page 0 / 0";
-  elements.pdfPrevPage.disabled = !state.pdfDoc || state.pdfCurrentPage <= 1;
-  elements.pdfNextPage.disabled = !state.pdfDoc || state.pdfCurrentPage >= state.pdfPageCount;
-  elements.pdfZoomOut.disabled = !state.pdfDoc || state.pdfZoom <= 0.75;
-  elements.pdfZoomIn.disabled = !state.pdfDoc || state.pdfZoom >= 2;
-  elements.pdfSearchButton.disabled = false;
-  elements.pdfSearchInput.disabled = false;
-}
-
-function setActivePdfPage(pageNumber) {
-  state.pdfCurrentPage = pageNumber;
-  elements.pdfDocument.querySelectorAll(".pdf-page-sheet").forEach((page) => {
-    page.classList.toggle("active", Number(page.dataset.pageNumber) === pageNumber);
-  });
-  elements.pdfThumbnails.querySelectorAll(".pdf-thumbnail").forEach((thumb) => {
-    const isActive = Number(thumb.dataset.pageNumber) === pageNumber;
-    thumb.classList.toggle("active", isActive);
-    if (isActive) thumb.scrollIntoView({ block: "nearest" });
-  });
-  updatePdfControls();
-}
-
-function scrollPdfPageIntoView(pageNumber, behavior = "smooth") {
-  const targetPage = elements.pdfDocument.querySelector(`[data-page-number="${pageNumber}"]`);
-  if (!targetPage) return;
-
-  state.pdfScrollSyncLocked = true;
-  targetPage.scrollIntoView({ block: "start", behavior });
-  setActivePdfPage(pageNumber);
-  window.setTimeout(() => {
-    state.pdfScrollSyncLocked = false;
-  }, behavior === "smooth" ? 350 : 0);
-}
-
-function syncPdfPageFromScroll() {
-  if (!state.pdfDoc || state.pdfScrollSyncLocked) return;
-
-  const viewportTop = elements.pdfViewport.scrollTop;
-  const pages = [...elements.pdfDocument.querySelectorAll(".pdf-page-sheet")];
-  if (!pages.length) return;
-
-  let closestPage = pages[0];
-  let closestDistance = Math.abs(pages[0].offsetTop - viewportTop);
-
-  pages.slice(1).forEach((page) => {
-    const distance = Math.abs(page.offsetTop - viewportTop);
-    if (distance < closestDistance) {
-      closestPage = page;
-      closestDistance = distance;
-    }
-  });
-
-  const nextPage = Number(closestPage.dataset.pageNumber);
-  if (nextPage !== state.pdfCurrentPage) setActivePdfPage(nextPage);
-}
-
-async function renderPdfDocument() {
-  if (!state.pdfDoc) return;
-
-  try {
-    setPdfLoading(true, `Loading ${state.pdfPageCount} pages...`);
-    elements.pdfDocument.innerHTML = "";
-    elements.pdfThumbnails.innerHTML = "";
-
-    for (let pageNumber = 1; pageNumber <= state.pdfPageCount; pageNumber += 1) {
-      const page = await state.pdfDoc.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: state.pdfZoom });
-      const thumbViewport = page.getViewport({ scale: 0.22 });
-      const pageShell = document.createElement("div");
-      const thumbButton = document.createElement("button");
-      const thumbCanvas = document.createElement("canvas");
-      const thumbContext = thumbCanvas.getContext("2d");
-      const thumbLabel = document.createElement("span");
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-
-      pageShell.className = "pdf-page-sheet";
-      pageShell.dataset.pageNumber = String(pageNumber);
-      thumbButton.className = "pdf-thumbnail";
-      thumbButton.type = "button";
-      thumbButton.dataset.pageNumber = String(pageNumber);
-      thumbLabel.className = "pdf-thumbnail-label";
-      thumbLabel.textContent = `Page ${pageNumber}`;
-      thumbCanvas.width = Math.ceil(thumbViewport.width);
-      thumbCanvas.height = Math.ceil(thumbViewport.height);
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      thumbButton.appendChild(thumbCanvas);
-      thumbButton.appendChild(thumbLabel);
-      pageShell.appendChild(canvas);
-      elements.pdfThumbnails.appendChild(thumbButton);
-      elements.pdfDocument.appendChild(pageShell);
-      thumbButton.addEventListener("click", () => scrollPdfPageIntoView(pageNumber));
-      await page.render({ canvasContext: thumbContext, viewport: thumbViewport }).promise;
-      await page.render({ canvasContext: context, viewport }).promise;
-    }
-
-    elements.pdfViewport.scrollTop = 0;
-    setActivePdfPage(Math.min(state.pdfCurrentPage, state.pdfPageCount) || 1);
-  } catch (error) {
-    elements.pdfSearchStatus.textContent = "The reference could not be rendered.";
-  } finally {
-    setPdfLoading(false);
+  if (!question) {
+    return state;
   }
+
+  state.reviewMarks[question.id] = true;
+  saveState(state);
+  return state;
 }
 
-async function loadPdfDocument(path) {
-  try {
-    setPdfLoading(true);
-    const loadingTask = pdfjsLib.getDocument(path);
-    state.pdfDoc = await loadingTask.promise;
-    state.pdfCurrentPage = 1;
-    state.pdfPageCount = state.pdfDoc.numPages;
-    state.pdfMatches = [];
-    elements.pdfModalMeta.textContent = `${state.pdfPageCount} pages`;
-    updatePdfControls();
-    await renderPdfDocument();
-    elements.pdfSearchStatus.textContent = "";
-  } catch (error) {
-    state.pdfDoc = null;
-    state.pdfPageCount = 0;
-    elements.pdfModalMeta.textContent = "Unable to load reference";
-    elements.pdfSearchStatus.textContent =
-      "This reference could not be loaded in the embedded viewer. Add the PDF locally or try a source that allows browser rendering.";
-    setPdfLoading(false);
-    updatePdfControls();
-  }
-}
+function renderReviewMap(state) {
+  const reviewGrid = document.getElementById("review-grid");
 
-function openPdfModal(path, title) {
-  elements.pdfModalTitle.textContent = title;
-  elements.pdfModalMeta.textContent = "Loading pages...";
-  elements.pdfSearchInput.value = "";
-  elements.pdfSearchStatus.textContent = "";
-  state.pdfZoom = 1;
-  state.pdfCurrentPage = 1;
-  state.pdfPageCount = 0;
-  state.pdfMatches = [];
-  elements.pdfModal.classList.add("active");
-  elements.pdfModal.setAttribute("aria-hidden", "false");
-  updatePdfControls();
-  loadPdfDocument(path);
-}
-
-function closePdfModal() {
-  elements.pdfModal.classList.remove("active");
-  elements.pdfModal.setAttribute("aria-hidden", "true");
-  elements.pdfSearchInput.value = "";
-  elements.pdfSearchStatus.textContent = "";
-  elements.pdfModalMeta.textContent = "0 pages";
-  state.pdfZoom = 1;
-  state.pdfDoc = null;
-  state.pdfCurrentPage = 1;
-  state.pdfPageCount = 0;
-  state.pdfMatches = [];
-  elements.pdfThumbnails.innerHTML = "";
-  elements.pdfDocument.innerHTML = "";
-  setPdfLoading(false);
-  updatePdfControls();
-}
-
-async function runPdfSearch() {
-  const keyword = elements.pdfSearchInput.value.trim();
-  if (!keyword) {
-    elements.pdfSearchStatus.textContent = "Enter a keyword to search this reference.";
-    return;
-  }
-  if (!state.pdfDoc) {
-    elements.pdfSearchStatus.textContent = "Open a reference first.";
+  if (!reviewGrid) {
     return;
   }
 
-  setPdfLoading(true, `Searching for "${keyword}"...`);
+  reviewGrid.innerHTML = "";
 
-  try {
-    const normalizedKeyword = keyword.toLowerCase();
-    const matches = [];
+  getActiveQuestions(state).forEach((question, index) => {
+    const tile = document.createElement("button");
+    const hasAnswer = !!state.userAnswers[question.id];
+    const needsReview = !!state.reviewMarks[question.id];
 
-    for (let pageNumber = 1; pageNumber <= state.pdfDoc.numPages; pageNumber += 1) {
-      const page = await state.pdfDoc.getPage(pageNumber);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item) => item.str).join(" ").toLowerCase();
-      if (pageText.includes(normalizedKeyword)) matches.push(pageNumber);
+    tile.type = "button";
+    tile.className = "review-tile";
+
+    if (hasAnswer) {
+      tile.classList.add("answered");
     }
 
-    if (!matches.length) {
-      elements.pdfSearchStatus.textContent = `No matches found for "${keyword}".`;
+    if (needsReview) {
+      tile.classList.add("review");
+    }
+
+    if (index === state.currentQ) {
+      tile.classList.add("current");
+    }
+
+    tile.textContent = String(question.id);
+    tile.addEventListener("click", () => {
+      const nextState = loadState();
+      nextState.currentQ = index;
+      saveState(nextState);
+
+      if (document.body.dataset.page === "review") {
+        window.location.href = "./exam.html";
+        return;
+      }
+
+      renderQuestion(nextState);
+      renderReviewMap(nextState);
+    });
+
+    reviewGrid.appendChild(tile);
+  });
+}
+
+async function updateReferenceStatuses() {
+  const linkedBooks = await fetchLinkedBooks();
+
+  document.querySelectorAll(".reference-book").forEach((button) => {
+    const book = books.find((entry) => entry.key === button.dataset.bookKey);
+    const meta = button.querySelector(".book-meta");
+    const linked = linkedBooks[button.dataset.bookKey];
+
+    if (!book || !meta) {
       return;
     }
 
-    state.pdfMatches = matches;
-    scrollPdfPageIntoView(matches[0]);
-    elements.pdfSearchStatus.textContent = `Found ${matches.length} page match${matches.length === 1 ? "" : "es"} for "${keyword}". Jumped to page ${matches[0]}.`;
-  } catch (error) {
-    elements.pdfSearchStatus.textContent = "This reference could not be searched. Some scanned or protected PDFs may not expose searchable text.";
-  } finally {
-    setPdfLoading(false);
-  }
-}
-
-function updatePauseUi() {
-  elements.pauseExam.textContent = state.paused ? "Resume Exam" : "Pause Exam";
-  elements.pauseOverlay.classList.toggle("active", state.paused);
-  elements.pauseOverlay.setAttribute("aria-hidden", state.paused ? "false" : "true");
-}
-
-function togglePauseExam(forceValue) {
-  state.paused = typeof forceValue === "boolean" ? forceValue : !state.paused;
-  updatePauseUi();
-}
-
-function adjustPdfZoom(direction) {
-  const nextZoom = Math.max(0.75, Math.min(2, state.pdfZoom + direction * 0.1));
-  state.pdfZoom = Number(nextZoom.toFixed(2));
-  renderPdfDocument();
-}
-
-function changePdfPage(direction) {
-  if (!state.pdfDoc) return;
-  const nextPage = Math.max(1, Math.min(state.pdfPageCount, state.pdfCurrentPage + direction));
-  scrollPdfPageIntoView(nextPage);
-}
-
-elements.prevQuestion.addEventListener("click", () => {
-  if (state.currentIndex > 0) {
-    state.currentIndex -= 1;
-    renderQuestion();
-  }
-});
-
-elements.nextQuestion.addEventListener("click", () => {
-  if (state.currentIndex === state.questions.length - 1) {
-    renderReviewScreen();
-    showScreen("review");
-    return;
-  }
-  state.currentIndex += 1;
-  renderQuestion();
-});
-
-elements.flagQuestion.addEventListener("click", () => {
-  const question = state.questions[state.currentIndex];
-  question.flagged = !question.flagged;
-  renderQuestion();
-});
-
-elements.markReview.addEventListener("click", () => {
-  const question = state.questions[state.currentIndex];
-  question.flagged = true;
-  if (state.currentIndex === state.questions.length - 1) {
-    renderReviewScreen();
-    showScreen("review");
-    return;
-  }
-  state.currentIndex += 1;
-  renderQuestion();
-});
-
-elements.submitExam.addEventListener("click", renderResults);
-elements.enterExam.addEventListener("click", enterExamWorkspace);
-elements.pauseExam.addEventListener("click", () => togglePauseExam());
-elements.resumeExam.addEventListener("click", () => togglePauseExam(false));
-elements.referenceLinks.forEach((link) => {
-  link.addEventListener("click", () => {
-    openPdfModal(link.dataset.pdf, link.dataset.title);
+    meta.textContent = linked ? `Opens in Preview: ${linked.fileName}` : "Click to choose PDF, then open in Preview";
   });
-});
-elements.closePdfModal.addEventListener("click", closePdfModal);
-elements.pdfSearchButton.addEventListener("click", runPdfSearch);
-elements.pdfZoomIn.addEventListener("click", () => adjustPdfZoom(1));
-elements.pdfZoomOut.addEventListener("click", () => adjustPdfZoom(-1));
-elements.pdfPrevPage.addEventListener("click", () => changePdfPage(-1));
-elements.pdfNextPage.addEventListener("click", () => changePdfPage(1));
-elements.pdfSearchInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") runPdfSearch();
-});
-elements.pdfModal.addEventListener("click", (event) => {
-  if (event.target === elements.pdfModal) closePdfModal();
-});
-elements.pdfViewport.addEventListener("scroll", syncPdfPageFromScroll);
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elements.pdfModal.classList.contains("active")) closePdfModal();
-});
+}
 
-resetExam();
-updatePdfControls();
-elements.examShell.classList.add("hidden");
+async function renderPreviewBookSetup() {
+  const container = document.getElementById("preview-book-setup-list");
+  const onlineList = document.getElementById("online-book-list");
+
+  if (!container && !onlineList) {
+    return;
+  }
+
+  const linkedBooks = await fetchLinkedBooks();
+  const requiredBooks = books.filter((book) => book.requiresLocalCopy);
+  const onlineBooks = books.filter((book) => book.online);
+
+  if (onlineList) {
+    onlineList.textContent = onlineBooks.map((book) => book.title).join(", ");
+  }
+
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = "";
+  requiredBooks.forEach((book) => {
+    const linked = linkedBooks[book.key];
+    const row = document.createElement("div");
+    row.className = "book-setup-row";
+    row.innerHTML = `
+      <div>
+        <strong>${book.title}</strong>
+        <span class="book-link-status">${linked ? `Linked for Preview: ${linked.fileName}` : "Not linked yet"}</span>
+      </div>
+      <button class="btn btn-secondary setup-reference-book" type="button">Link to my copy</button>
+    `;
+
+    row.querySelector("button")?.addEventListener("click", async () => {
+      const button = row.querySelector("button");
+      button.disabled = true;
+      button.textContent = "Choose PDF...";
+
+      try {
+        await linkReferenceBook(book);
+        await renderPreviewBookSetup();
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : `Unable to link ${book.title}`);
+        button.disabled = false;
+        button.textContent = "Link to my copy";
+      }
+    });
+
+    container.appendChild(row);
+  });
+}
+
+async function openReferenceBook(book) {
+  if (!book) {
+    return;
+  }
+
+  if (book.online) {
+    window.open(book.path, "_blank", "noopener");
+    return;
+  }
+
+  try {
+    const response = await fetch("/open-book", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        key: book.key,
+        title: book.title,
+        linkIfMissing: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail.error || "Unable to open reference book");
+    }
+
+    await updateReferenceStatuses();
+  } catch (error) {
+    window.alert(
+      `${error instanceof Error ? error.message : "Unable to open reference book"}\n\nReference books open in Preview only from the local server at http://127.0.0.1:4175/start.html. Make sure the local server is running, then try again.`
+    );
+  }
+}
+
+function bindReferenceButtons() {
+  document.querySelectorAll(".reference-book, .online-reference").forEach((button) => {
+    const book = books.find((entry) => entry.key === button.dataset.bookKey);
+    button.addEventListener("click", () => openReferenceBook(book));
+  });
+}
+
+function initReviewPage() {
+  const state = ensureExamState();
+  if (!state) {
+    return;
+  }
+
+  renderReviewListPage(state);
+}
+
+async function initStartPage() {
+  await renderPreviewBookSetup();
+  const account = loadSampleAccount();
+  const emailInput = document.getElementById("sample-email");
+  const status = document.getElementById("sample-account-status");
+
+  if (account?.email && emailInput) {
+    emailInput.value = account.email;
+  }
+
+  document.getElementById("sample-account-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = emailInput?.value || "";
+
+    if (status) {
+      status.textContent = "Loading question bank...";
+    }
+
+    const savedAccount = isValidEmail(email) ? saveSampleAccount(email) : null;
+    startNewExam({ mode: "sample", accountEmail: savedAccount?.email || null });
+  });
+
+  document.getElementById("begin-full-exam")?.addEventListener("click", () => {
+    if (status) {
+      status.textContent = "Loading question bank...";
+    }
+    startNewExam({ mode: "full", accountEmail: account?.email || null });
+  });
+
+  document.getElementById("start-score-link")?.addEventListener("click", () => {
+    window.location.href = "./results.html";
+  });
+}
+
+async function initExamPage() {
+  await loadQuestionBank();
+  let state = ensureExamState();
+  if (!state) {
+    return;
+  }
+
+  renderQuestion(state);
+  renderReviewMap(state);
+
+  const modeLabel = document.getElementById("exam-mode-label");
+  if (modeLabel) {
+    modeLabel.textContent = state.mode === "sample" ? "Sample Exam - 5 Questions" : "Full Exam - 50 Questions";
+  }
+
+  const sourceLabel = document.getElementById("question-source-label");
+  if (sourceLabel) {
+    sourceLabel.textContent = questionBankSource.label;
+    sourceLabel.dataset.sourceType = questionBankSource.type;
+  }
+
+  bindReferenceButtons();
+  await updateReferenceStatuses();
+
+  const timer = document.getElementById("timer");
+  const previousButton = document.getElementById("prev-question");
+  const markReviewButton = document.getElementById("mark-review");
+  const nextButton = document.getElementById("next-question");
+  const submitButton = document.getElementById("submit-exam");
+
+  const syncTimer = () => {
+    state = loadState();
+    const remaining = calculateRemainingSeconds(state);
+
+    if (timer) {
+      timer.textContent = formatTime(remaining);
+    }
+
+    if (remaining <= 0) {
+      submitExam({ expired: true });
+    }
+  };
+
+  syncTimer();
+  const timerId = window.setInterval(syncTimer, 1000);
+
+  previousButton?.addEventListener("click", () => {
+    const nextState = loadState();
+    if (nextState.currentQ > 0) {
+      nextState.currentQ -= 1;
+      saveState(nextState);
+      renderQuestion(nextState);
+      renderReviewMap(nextState);
+    }
+  });
+
+  markReviewButton?.addEventListener("click", () => {
+    const nextState = markCurrentQuestionForReview();
+    renderQuestion(nextState);
+    renderReviewMap(nextState);
+  });
+
+  nextButton?.addEventListener("click", () => {
+    const nextState = loadState();
+    const activeQuestions = getActiveQuestions(nextState);
+    const currentQuestion = activeQuestions[nextState.currentQ];
+
+    if (currentQuestion && !nextState.userAnswers[currentQuestion.id]) {
+      nextState.reviewMarks[currentQuestion.id] = true;
+    }
+
+    if (nextState.currentQ < activeQuestions.length - 1) {
+      nextState.currentQ += 1;
+      saveState(nextState);
+      renderQuestion(nextState);
+      renderReviewMap(nextState);
+      return;
+    }
+
+    saveState(nextState);
+    window.clearInterval(timerId);
+    submitExam();
+  });
+
+  submitButton?.addEventListener("click", () => {
+    window.clearInterval(timerId);
+    submitExam();
+  });
+
+  window.addEventListener("beforeunload", () => {
+    window.clearInterval(timerId);
+  });
+}
+
+async function initResultsPage() {
+  await loadQuestionBank();
+  const state = loadState();
+  const scoreCircle = document.getElementById("score-circle");
+  const scoreText = document.getElementById("score-text");
+  const modeLabel = document.getElementById("results-mode-label");
+  const answerReviewList = document.getElementById("answer-review-list");
+
+  if (!scoreCircle || !scoreText) {
+    return;
+  }
+
+  if (state.score === null) {
+    scoreCircle.innerHTML = `<div><div class="score-main">--</div><div class="score-sub">No score yet</div></div>`;
+    scoreText.innerHTML = "No exam has been completed yet. Start from the opening screen, take the exam, and this page will show the score.";
+  } else {
+    const activeQuestions = getActiveQuestions(state);
+    const correctCount = activeQuestions.filter((question) => state.userAnswers[question.id] === question.correct).length;
+    const incorrectCount = activeQuestions.length - correctCount;
+    const unansweredCount = getUnansweredQuestions(state).length;
+
+    if (modeLabel) {
+      modeLabel.textContent = state.mode === "sample" ? "Sample Exam Complete" : "Full Exam Complete";
+    }
+    scoreCircle.innerHTML = `<div><div class="score-main">${state.score}</div><div class="score-sub">/ 100</div></div>`;
+    scoreText.innerHTML = `
+      You scored <strong>${state.score}</strong> out of 100 points.
+      <br><strong>${correctCount}</strong> correct, <strong>${incorrectCount}</strong> incorrect, <strong>${unansweredCount}</strong> unanswered.
+      ${state.expired ? '<br><span style="color:#b03f3f">Time expired</span>' : ""}
+    `;
+  }
+
+  if (answerReviewList) {
+    const activeQuestions = getActiveQuestions(state);
+    answerReviewList.innerHTML = "";
+
+    if (!activeQuestions.length) {
+      answerReviewList.innerHTML = `<p class="muted">No questions are available for review.</p>`;
+    }
+
+    activeQuestions.forEach((question, index) => {
+      const userAnswer = state.userAnswers[question.id] || "";
+      const isCorrect = userAnswer === question.correct;
+      const card = document.createElement("article");
+      card.className = `answer-review-card ${isCorrect ? "correct" : "incorrect"}`;
+      card.innerHTML = `
+        <div class="answer-review-topline">
+          <span class="badge ${isCorrect ? "good" : "warn"}">${isCorrect ? "Correct" : userAnswer ? "Incorrect" : "Unanswered"}</span>
+          <span class="muted">Question ${index + 1}</span>
+        </div>
+        <h3>${cleanQuestionText(question.text)}</h3>
+        <div class="answer-review-answers">
+          <p><strong>Your answer:</strong> ${formatAnswerText(question, userAnswer)}</p>
+          <p><strong>Correct answer:</strong> ${formatAnswerText(question, question.correct)}</p>
+        </div>
+        <div class="answer-reference">
+          <strong>Where to verify:</strong> ${buildAnswerReference(question)}
+        </div>
+        ${question.explanation ? `<div class="answer-explanation"><strong>Explanation:</strong> ${question.explanation}</div>` : ""}
+      `;
+      answerReviewList.appendChild(card);
+    });
+  }
+
+  document.getElementById("results-start-link")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    resetState();
+    window.location.href = "./start.html";
+  });
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const page = document.body.dataset.page;
+
+  if (page === "start") {
+    await initStartPage();
+  } else if (page === "exam") {
+    await initExamPage();
+  } else if (page === "review") {
+    await loadQuestionBank();
+    initReviewPage();
+  } else if (page === "results") {
+    await initResultsPage();
+  }
+});
