@@ -819,7 +819,7 @@ async function updateReferenceStatuses() {
     button.disabled = !localPreview;
     meta.textContent = localPreview
       ? linked
-        ? linkedBookLabel(book)
+        ? "Linked"
         : "Click to choose PDF, then open in Preview"
       : "Local Preview only";
   });
@@ -855,7 +855,7 @@ async function renderPreviewBookSetup() {
     row.innerHTML = `
       <div>
         <strong>${book.title}</strong>
-        <span class="book-link-status">${localPreview ? (linked ? label : "Not linked yet") : "Local Preview only"}</span>
+        <span class="book-link-status">${localPreview ? (linked ? "Linked" : "Not linked yet") : "Local Preview only"}</span>
       </div>
       <button class="btn btn-secondary setup-reference-book" type="button" ${localPreview ? "" : "disabled"}>
         ${localPreview ? (linked ? label : "Link to my copy") : "Local desktop only"}
