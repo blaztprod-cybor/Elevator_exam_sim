@@ -95,6 +95,14 @@ function linkedBookLabel(book) {
   return book?.linkedLabel || book?.title || "Linked copy";
 }
 
+function isLocalPreviewServer() {
+  return ["127.0.0.1", "localhost"].includes(window.location.hostname);
+}
+
+function localPreviewMessage() {
+  return "Preview linking works only from the local desktop server at http://127.0.0.1:4175/start.html. GitHub Pages cannot link to files on your computer or open macOS Preview.";
+}
+
 function getConfig() {
   const config = window.ELEVATOR_EXAM_CONFIG || {};
   const fullQuestionCount = Number(config.fullQuestionCount || config.questionCount);
@@ -141,6 +149,10 @@ function loadSampleAccount() {
 }
 
 async function fetchLinkedBooks() {
+  if (!isLocalPreviewServer()) {
+    return {};
+  }
+
   try {
     const response = await fetch("/linked-books", { cache: "no-store" });
     if (!response.ok) {
@@ -154,6 +166,10 @@ async function fetchLinkedBooks() {
 }
 
 async function linkReferenceBook(book) {
+  if (!isLocalPreviewServer()) {
+    throw new Error(localPreviewMessage());
+  }
+
   const response = await fetch("/link-book", {
     method: "POST",
     headers: {
@@ -788,6 +804,7 @@ function renderReviewMap(state) {
 }
 
 async function updateReferenceStatuses() {
+  const localPreview = isLocalPreviewServer();
   const linkedBooks = await fetchLinkedBooks();
 
   document.querySelectorAll(".reference-book").forEach((button) => {
@@ -799,7 +816,12 @@ async function updateReferenceStatuses() {
       return;
     }
 
-    meta.textContent = linked ? linkedBookLabel(book) : "Click to choose PDF, then open in Preview";
+    button.disabled = !localPreview;
+    meta.textContent = localPreview
+      ? linked
+        ? linkedBookLabel(book)
+        : "Click to choose PDF, then open in Preview"
+      : "Local Preview only";
   });
 }
 
@@ -825,6 +847,7 @@ async function renderPreviewBookSetup() {
 
   container.innerHTML = "";
   requiredBooks.forEach((book) => {
+    const localPreview = isLocalPreviewServer();
     const linked = linkedBooks[book.key];
     const label = linkedBookLabel(book);
     const row = document.createElement("div");
@@ -832,9 +855,11 @@ async function renderPreviewBookSetup() {
     row.innerHTML = `
       <div>
         <strong>${book.title}</strong>
-        <span class="book-link-status">${linked ? label : "Not linked yet"}</span>
+        <span class="book-link-status">${localPreview ? (linked ? label : "Not linked yet") : "Local Preview only"}</span>
       </div>
-      <button class="btn btn-secondary setup-reference-book" type="button">${linked ? label : "Link to my copy"}</button>
+      <button class="btn btn-secondary setup-reference-book" type="button" ${localPreview ? "" : "disabled"}>
+        ${localPreview ? (linked ? label : "Link to my copy") : "Local desktop only"}
+      </button>
     `;
 
     row.querySelector("button")?.addEventListener("click", async () => {
@@ -863,6 +888,11 @@ async function openReferenceBook(book) {
 
   if (book.online) {
     window.open(book.path, "_blank", "noopener");
+    return;
+  }
+
+  if (!isLocalPreviewServer()) {
+    window.alert(localPreviewMessage());
     return;
   }
 

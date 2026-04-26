@@ -375,6 +375,13 @@ a {
   cursor: pointer;
 }
 
+.reference-book:disabled,
+.setup-reference-book:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  transform: none;
+}
+
 .reference-book:hover,
 .online-reference:hover {
   border-color: var(--primary);
