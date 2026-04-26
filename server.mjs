@@ -1,6 +1,7 @@
-import express from "express";
+import http from "node:http";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { constants } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -8,16 +9,65 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const app = express();
 const PORT = Number(process.env.PORT || 4175);
 const LINKED_BOOKS_PATH = path.join(__dirname, ".linked-books.json");
 
-app.use(express.json());
-app.use(express.static(__dirname));
+const allowedRoots = [path.join(__dirname, "reference-pdfs")];
+const mimeTypes = {
+  ".css": "text/css; charset=utf-8",
+  ".csv": "text/csv; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".pdf": "application/pdf",
+};
 
-const allowedRoots = [
-  path.join(__dirname, "reference-pdfs"),
-];
+function sendJson(res, status, body) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(body));
+}
+
+function sendEmpty(res, status = 204) {
+  res.writeHead(status);
+  res.end();
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  return raw ? JSON.parse(raw) : {};
+}
+
+function resolveStaticPath(urlPath) {
+  const decodedPath = decodeURIComponent(urlPath.split("?")[0]);
+  const cleanPath = decodedPath === "/" ? "/index.html" : decodedPath;
+  const absolutePath = path.resolve(__dirname, `.${cleanPath}`);
+
+  if (!absolutePath.startsWith(__dirname + path.sep) && absolutePath !== __dirname) {
+    throw new Error("Invalid path");
+  }
+
+  return absolutePath;
+}
+
+async function serveStatic(req, res) {
+  try {
+    const filePath = resolveStaticPath(new URL(req.url, `http://${req.headers.host}`).pathname);
+    await fs.access(filePath, constants.R_OK);
+    const content = await fs.readFile(filePath);
+    const contentType = mimeTypes[path.extname(filePath)] || "application/octet-stream";
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(content);
+  } catch {
+    sendJson(res, 404, { error: "Not found" });
+  }
+}
 
 function resolveBookPath(relativePath) {
   const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "");
@@ -120,14 +170,16 @@ async function constrainPreviewWindow() {
   await execFileAsync("osascript", ["-e", script]);
 }
 
-app.post("/open-book", async (req, res) => {
+async function handleOpenBook(req, res) {
   try {
-    const inputKey = String(req.body?.key || "");
-    const inputTitle = String(req.body?.title || inputKey || "");
-    const inputPath = String(req.body?.path || "");
-    const linkIfMissing = req.body?.linkIfMissing === true;
+    const body = await readJsonBody(req);
+    const inputKey = String(body?.key || "");
+    const inputTitle = String(body?.title || inputKey || "");
+    const inputPath = String(body?.path || "");
+    const linkIfMissing = body?.linkIfMissing === true;
+
     if (!inputKey && !inputPath) {
-      res.status(400).json({ error: "Missing book key or path" });
+      sendJson(res, 400, { error: "Missing book key or path" });
       return;
     }
 
@@ -139,13 +191,13 @@ app.post("/open-book", async (req, res) => {
     });
     await execFileAsync("open", ["-a", "Preview", absolutePath]);
     await constrainPreviewWindow();
-    res.status(204).end();
+    sendEmpty(res);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to open book" });
+    sendJson(res, 500, { error: error instanceof Error ? error.message : "Unable to open book" });
   }
-});
+}
 
-app.get("/linked-books", async (_req, res) => {
+async function handleLinkedBooks(_req, res) {
   const linkedBooks = await readLinkedBooks();
   const response = Object.fromEntries(
     Object.entries(linkedBooks).map(([key, value]) => [
@@ -157,16 +209,17 @@ app.get("/linked-books", async (_req, res) => {
       },
     ])
   );
-  res.json(response);
-});
+  sendJson(res, 200, response);
+}
 
-app.post("/link-book", async (req, res) => {
+async function handleLinkBook(req, res) {
   try {
-    const key = String(req.body?.key || "").trim();
-    const title = String(req.body?.title || key || "reference book").trim();
+    const body = await readJsonBody(req);
+    const key = String(body?.key || "").trim();
+    const title = String(body?.title || key || "reference book").trim();
 
     if (!key) {
-      res.status(400).json({ error: "Missing book key" });
+      sendJson(res, 400, { error: "Missing book key" });
       return;
     }
 
@@ -178,17 +231,43 @@ app.post("/link-book", async (req, res) => {
       linkedAt: Date.now(),
     };
     await writeLinkedBooks(linkedBooks);
-    res.json({
+    sendJson(res, 200, {
       key,
       title,
       fileName: path.basename(selectedPath),
       linkedAt: linkedBooks[key].linkedAt,
     });
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to link book" });
+    sendJson(res, 500, { error: error instanceof Error ? error.message : "Unable to link book" });
   }
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+
+  if (req.method === "POST" && url.pathname === "/open-book") {
+    await handleOpenBook(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/linked-books") {
+    await handleLinkedBooks(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/link-book") {
+    await handleLinkBook(req, res);
+    return;
+  }
+
+  if (req.method === "GET" || req.method === "HEAD") {
+    await serveStatic(req, res);
+    return;
+  }
+
+  sendJson(res, 405, { error: "Method not allowed" });
 });
 
-app.listen(PORT, "127.0.0.1", () => {
+server.listen(PORT, "127.0.0.1", () => {
   console.log(`Elevator exam app running at http://127.0.0.1:${PORT}/start.html`);
 });
