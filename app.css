@@ -321,13 +321,14 @@ a {
 
 .exam-layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(420px, 1fr);
   gap: 20px;
   min-height: calc(100vh - 152px);
 }
 
 .sidebar,
-.exam-panel {
+.exam-panel,
+.pdf-panel {
   min-height: 0;
 }
 
@@ -375,13 +376,6 @@ a {
   cursor: pointer;
 }
 
-.reference-book:disabled,
-.setup-reference-book:disabled {
-  cursor: not-allowed;
-  opacity: 0.68;
-  transform: none;
-}
-
 .reference-book:hover,
 .online-reference:hover {
   border-color: var(--primary);
@@ -406,6 +400,134 @@ a {
 
 .exam-panel {
   padding: 30px;
+}
+
+.pdf-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 22px;
+}
+
+.pdf-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.pdf-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.pdf-upload {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.pdf-upload input {
+  width: 100%;
+  color: var(--ink);
+  font: inherit;
+}
+
+.pdf-open-link {
+  width: fit-content;
+  color: var(--primary);
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.pdf-open-link[hidden] {
+  display: none;
+}
+
+.pdf-js-viewer {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.pdf-js-viewer[hidden] {
+  display: none;
+}
+
+.pdf-js-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.pdf-js-toolbar .btn {
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+}
+
+#pdf-page-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+#pdf-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+#pdf-viewer {
+  width: 100%;
+  min-height: 560px;
+  height: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.pdf-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.viewer-shell {
+  width: min(1100px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 20px 0 32px;
+}
+
+.standalone-pdf-panel {
+  display: grid;
+  gap: 12px;
+  min-height: calc(100vh - 150px);
+  padding: 18px;
+}
+
+.standalone-pdf-panel .pdf-js-viewer {
+  min-height: calc(100vh - 220px);
 }
 
 .question-meta {
@@ -681,6 +803,10 @@ a {
   .exam-layout {
     grid-template-columns: 1fr;
   }
+
+  #pdf-viewer {
+    min-height: 70vh;
+  }
 }
 
 @media (max-width: 720px) {
@@ -691,6 +817,7 @@ a {
 
   .hero-card,
   .exam-panel,
+  .pdf-panel,
   .results-card {
     padding: 28px 20px;
   }
