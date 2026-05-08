@@ -18,6 +18,16 @@ window.ELEVATOR_EXAM_CONFIG = {
       sourceGroup: "Inspections",
       url: "https://docs.google.com/spreadsheets/d/1XSD_CNSqc9tiPmReZV6k6F1mtNWdIqXu6hR29S5yN1s/edit?gid=1615442244",
     },
+    {
+      label: "Existing",
+      sourceGroup: "Existing",
+      url: "https://docs.google.com/spreadsheets/d/1XSD_CNSqc9tiPmReZV6k6F1mtNWdIqXu6hR29S5yN1s/edit?gid=451646576",
+    },
+    {
+      label: "Ele/Esc Electrical",
+      sourceGroup: "Ele/Esc Electrical",
+      url: "https://docs.google.com/spreadsheets/d/1XSD_CNSqc9tiPmReZV6k6F1mtNWdIqXu6hR29S5yN1s/edit?gid=393486330",
+    },
   ],
   localQuestionBankUrl: "./question-bank-1000.csv",
   fullQuestionCount: 50,
@@ -25,8 +35,10 @@ window.ELEVATOR_EXAM_CONFIG = {
   sampleQuestionCount: 5,
   sampleDurationMinutes: 18,
   sourceMix: [
-    { sourceGroup: "Sheet1", count: 29 },
+    { sourceGroup: "Sheet1", count: 15 },
     { sourceGroup: "Escalators", count: 14 },
     { sourceGroup: "Inspections", count: 7 },
+    { sourceGroup: "Existing", count: 7 },
+    { sourceGroup: "Ele/Esc Electrical", count: 7 },
   ],
 };

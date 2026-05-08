@@ -596,6 +596,10 @@ function getActiveQuestions(state = loadState()) {
   return questionBank;
 }
 
+function getQuestionKey(question) {
+  return String(question?.bankKey || question?.id || "");
+}
+
 function shuffleArray(items) {
   const shuffled = [...items];
 
@@ -716,7 +720,7 @@ function calculateScore(state) {
   const activeQuestions = getActiveQuestions(state);
   const pointsPerQuestion = activeQuestions.length ? 100 / activeQuestions.length : 0;
   activeQuestions.forEach((question) => {
-    if (state.userAnswers[question.id] === question.correct) {
+    if (state.userAnswers[getQuestionKey(question)] === question.correct) {
       score += pointsPerQuestion;
     }
   });
@@ -724,11 +728,12 @@ function calculateScore(state) {
 }
 
 function getUnansweredQuestions(state) {
-  return getActiveQuestions(state).filter((question) => !state.userAnswers[question.id]);
+  return getActiveQuestions(state).filter((question) => !state.userAnswers[getQuestionKey(question)]);
 }
 
 function getQuestionDisplayNumber(state, question) {
-  return getActiveQuestions(state).findIndex((item) => item.id === question.id) + 1;
+  const questionKey = getQuestionKey(question);
+  return getActiveQuestions(state).findIndex((item) => getQuestionKey(item) === questionKey) + 1;
 }
 
 function formatAnswerText(question, answerLetter) {
@@ -847,7 +852,7 @@ function renderQuestion(state) {
   }
   if (reviewStatus) {
     const pointsPerQuestion = activeQuestions.length ? Math.round(100 / activeQuestions.length) : 0;
-    reviewStatus.textContent = state.reviewMarks[question.id] ? "Marked for review" : `${pointsPerQuestion} points each`;
+    reviewStatus.textContent = state.reviewMarks[getQuestionKey(question)] ? "Marked for review" : `${pointsPerQuestion} points each`;
   }
   if (nextButton) {
     nextButton.textContent = state.currentQ >= activeQuestions.length - 1 ? "Exam Complete" : "Next";
@@ -859,10 +864,10 @@ function renderQuestion(state) {
       ${question.options
         .map((option, index) => {
           const letter = String.fromCharCode(65 + index);
-          const checked = state.userAnswers[question.id] === letter ? "checked" : "";
+          const checked = state.userAnswers[getQuestionKey(question)] === letter ? "checked" : "";
           return `
             <label class="answer-option">
-              <input type="radio" name="question-${question.id}" value="${letter}" ${checked}>
+              <input type="radio" name="question-${getQuestionKey(question)}" value="${letter}" ${checked}>
               <span>${option}</span>
             </label>
           `;
@@ -874,8 +879,9 @@ function renderQuestion(state) {
   currentQuestion.querySelectorAll("input[type='radio']").forEach((input) => {
     input.addEventListener("change", () => {
       const nextState = loadState();
-      nextState.userAnswers[question.id] = input.value;
-      delete nextState.reviewMarks[question.id];
+      const questionKey = getQuestionKey(question);
+      nextState.userAnswers[questionKey] = input.value;
+      delete nextState.reviewMarks[questionKey];
       saveState(nextState);
       renderQuestion(nextState);
       renderReviewMap(nextState);
@@ -892,7 +898,7 @@ function buildAnswerOptions(question, selectedAnswer) {
           const checked = selectedAnswer === letter ? "checked" : "";
           return `
             <label class="answer-option">
-              <input type="radio" name="question-${question.id}" value="${letter}" ${checked}>
+              <input type="radio" name="question-${getQuestionKey(question)}" value="${letter}" ${checked}>
               <span>${option}</span>
             </label>
           `;
@@ -903,7 +909,10 @@ function buildAnswerOptions(question, selectedAnswer) {
 }
 
 function getReviewQuestions(state) {
-  return getActiveQuestions(state).filter((question) => !state.userAnswers[question.id] || state.reviewMarks[question.id]);
+  return getActiveQuestions(state).filter((question) => {
+    const questionKey = getQuestionKey(question);
+    return !state.userAnswers[questionKey] || state.reviewMarks[questionKey];
+  });
 }
 
 function renderReviewListPage(state) {
@@ -929,9 +938,10 @@ function renderReviewListPage(state) {
   reviewQuestions.forEach((question) => {
     const card = document.createElement("section");
     card.className = "review-question-card";
-    const needsReview = !!state.reviewMarks[question.id];
-    const answered = !!state.userAnswers[question.id];
-    const displayNumber = getActiveQuestions(state).findIndex((item) => item.id === question.id) + 1;
+    const questionKey = getQuestionKey(question);
+    const needsReview = !!state.reviewMarks[questionKey];
+    const answered = !!state.userAnswers[questionKey];
+    const displayNumber = getQuestionDisplayNumber(state, question);
 
     card.innerHTML = `
       <div class="question-meta">
@@ -942,14 +952,14 @@ function renderReviewListPage(state) {
         <div class="muted">${needsReview ? "Marked for review" : answered ? "Answered" : "Unanswered"}</div>
       </div>
       <h3>${cleanQuestionText(question.text)}</h3>
-      ${buildAnswerOptions(question, state.userAnswers[question.id])}
+      ${buildAnswerOptions(question, state.userAnswers[questionKey])}
     `;
 
     card.querySelectorAll("input[type='radio']").forEach((input) => {
       input.addEventListener("change", () => {
         const nextState = loadState();
-        nextState.userAnswers[question.id] = input.value;
-        delete nextState.reviewMarks[question.id];
+        nextState.userAnswers[questionKey] = input.value;
+        delete nextState.reviewMarks[questionKey];
         saveState(nextState);
         renderReviewListPage(nextState);
       });
@@ -967,7 +977,7 @@ function markCurrentQuestionForReview() {
     return state;
   }
 
-  state.reviewMarks[question.id] = true;
+  state.reviewMarks[getQuestionKey(question)] = true;
   saveState(state);
   return state;
 }
@@ -983,8 +993,9 @@ function renderReviewMap(state) {
 
   getActiveQuestions(state).forEach((question, index) => {
     const tile = document.createElement("button");
-    const hasAnswer = !!state.userAnswers[question.id];
-    const needsReview = !!state.reviewMarks[question.id];
+    const questionKey = getQuestionKey(question);
+    const hasAnswer = !!state.userAnswers[questionKey];
+    const needsReview = !!state.reviewMarks[questionKey];
 
     tile.type = "button";
     tile.className = "review-tile";
@@ -1001,7 +1012,7 @@ function renderReviewMap(state) {
       tile.classList.add("current");
     }
 
-    tile.textContent = String(question.id);
+    tile.textContent = String(index + 1);
     tile.addEventListener("click", () => {
       const nextState = loadState();
       nextState.currentQ = index;
@@ -1390,8 +1401,8 @@ async function initExamPage() {
     const activeQuestions = getActiveQuestions(nextState);
     const currentQuestion = activeQuestions[nextState.currentQ];
 
-    if (currentQuestion && !nextState.userAnswers[currentQuestion.id]) {
-      nextState.reviewMarks[currentQuestion.id] = true;
+    if (currentQuestion && !nextState.userAnswers[getQuestionKey(currentQuestion)]) {
+      nextState.reviewMarks[getQuestionKey(currentQuestion)] = true;
     }
 
     if (nextState.currentQ < activeQuestions.length - 1) {
@@ -1434,7 +1445,7 @@ async function initResultsPage() {
     scoreText.innerHTML = "No exam has been completed yet. Start from the opening screen, take the exam, and this page will show the score.";
   } else {
     const activeQuestions = getActiveQuestions(state);
-    const correctCount = activeQuestions.filter((question) => state.userAnswers[question.id] === question.correct).length;
+    const correctCount = activeQuestions.filter((question) => state.userAnswers[getQuestionKey(question)] === question.correct).length;
     const incorrectCount = activeQuestions.length - correctCount;
     const unansweredCount = getUnansweredQuestions(state).length;
 
@@ -1458,7 +1469,7 @@ async function initResultsPage() {
     }
 
     activeQuestions.forEach((question, index) => {
-      const userAnswer = state.userAnswers[question.id] || "";
+      const userAnswer = state.userAnswers[getQuestionKey(question)] || "";
       const isCorrect = userAnswer === question.correct;
       const card = document.createElement("article");
       card.className = `answer-review-card ${isCorrect ? "correct" : "incorrect"}`;
