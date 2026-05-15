@@ -1,6 +1,14 @@
 const STORAGE_KEY = "elevator_exam_state_v1";
 const QUESTION_BANK_CACHE_KEY = "elevator_exam_question_bank_v1";
 const SAMPLE_ACCOUNT_KEY = "elevator_exam_sample_account_v1";
+const FULL_ACCESS_KEY = "elevator_exam_full_access_v1";
+const SAMPLE_ACCESS_COUNTS_KEY = "elevator_exam_sample_access_counts_v1";
+const SAMPLE_QUESTION_HISTORY_KEY = "elevator_exam_sample_question_history_v1";
+const FULL_QUESTION_HISTORY_KEY = "elevator_exam_full_question_history_v1";
+const SAMPLE_ACCESS_LIMIT = 3;
+const SAMPLE_ACCESS_UNLIMITED_EMAIL = "shawn.raynor@gmail.com";
+const SAMPLE_QUESTION_HISTORY_LIMIT = 5000;
+const FULL_QUESTION_HISTORY_LIMIT = 20000;
 const SESSION_PDF_DB_NAME = "elevator_exam_session_pdf_v1";
 const SESSION_PDF_STORE_NAME = "pdfs";
 const SESSION_PDF_RECORD_KEY = "active-codebook";
@@ -11,32 +19,23 @@ const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
 const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
 
 const books = [
-  { title: "A17.1", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
-  { title: "A17.2", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
-  { title: "A17.3", key: "a17-3", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
-  { title: "A17.5", key: "a17-5", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
-  { title: "ANSI A10.4", key: "ansi-a10-4", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
-  { title: "ASME A90.1", key: "asme-a90-1", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
-  { title: "B20.1", key: "b20-1", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
-  { title: "ICC A117.1 ADA", key: "icc-a117-1", path: "./reference-pdfs/national/ICC - A117 -1- 2009 - ADA.pdf", requiresLocalCopy: true },
-  {
-    title: "New York Appendix K",
-    key: "ny-appendix-k",
-    path: "https://www.nyc.gov/assets/buildings/building_code/update_63_combined_instructions.pdf",
-    online: true,
-  },
-  {
-    title: "NYC Chapter 33",
-    key: "nyc-chapter-33",
-    path: "https://www.nyc.gov/assets/buildings/codes-pdf/cons_codes_2022/2022BC_Chapter33_Con_DemoSafetyWBwm.pdf",
-    online: true,
-  },
-  {
-    title: "NYC Electrical Code",
-    key: "nyc-electrical-code",
-    path: "https://www.nyc.gov/assets/buildings/pdf/admin_sec_2007_elec_code.pdf",
-    online: true,
-  },
+  { title: "ASME A17.1-2013", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
+  { title: "ASME A17.2-2014", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
+  { title: "ASME A17.3-2015", key: "a17-3", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
+  { title: "ASME A17.5-2004", key: "a17-5", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
+  { title: "ASME A90.1-2009", key: "asme-a90-1", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
+  { title: "ASME B20.1-2015", key: "b20-1", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
+  { title: "ANSI A10.4-2016", key: "ansi-a10-4", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
+  { title: "ICC A117.1-2009", key: "icc-a117-1", path: "./reference-pdfs/national/ICC - A117 -1- 2009 - ADA.pdf", requiresLocalCopy: true },
+  { title: "2014 NYC Construction Codes", key: "nyc-2014-construction-codes", path: "./reference-pdfs/nyc/2014-nyc-construction-codes.pdf", requiresLocalCopy: true },
+  { title: "NYC Building Code Chapter 11", key: "nyc-bc-chapter-11", path: "./reference-pdfs/nyc/nyc-building-code-chapter-11.pdf", requiresLocalCopy: true },
+  { title: "NYC Building Code Chapter 30", key: "nyc-bc-chapter-30", path: "./reference-pdfs/nyc/nyc-building-code-chapter-30.pdf", requiresLocalCopy: true },
+  { title: "NYC Building Code Chapter 33", key: "nyc-chapter-33", path: "./reference-pdfs/nyc/2022BC_Chapter33_Con_DemoSafetyWBwm.pdf", requiresLocalCopy: true },
+  { title: "Appendix K1", key: "appendix-k1", path: "./reference-pdfs/nyc/appendix-k1.pdf", requiresLocalCopy: true },
+  { title: "Appendix K2", key: "appendix-k2", path: "./reference-pdfs/nyc/appendix-k2.pdf", requiresLocalCopy: true },
+  { title: "Appendix K3", key: "appendix-k3", path: "./reference-pdfs/nyc/appendix-k3.pdf", requiresLocalCopy: true },
+  { title: "Appendix K4", key: "appendix-k4", path: "./reference-pdfs/nyc/appendix-k4.pdf", requiresLocalCopy: true },
+  { title: "NYC Electrical Code 2011", key: "nyc-electrical-code", path: "./reference-pdfs/nyc/Electrical-Code-Local-Law-39of2011.pdf", requiresLocalCopy: true },
 ];
 
 const SAMPLE_QUESTIONS = [
@@ -168,9 +167,13 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function normalizeSampleEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 function saveSampleAccount(email) {
   const account = {
-    email: String(email || "").trim().toLowerCase(),
+    email: normalizeSampleEmail(email),
     createdAt: Date.now(),
   };
   localStorage.setItem(SAMPLE_ACCOUNT_KEY, JSON.stringify(account));
@@ -189,6 +192,178 @@ function loadSampleAccount() {
   } catch {
     return null;
   }
+}
+
+function loadSampleAccessCounts() {
+  try {
+    const raw = localStorage.getItem(SAMPLE_ACCESS_COUNTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSampleAccessCounts(counts) {
+  localStorage.setItem(SAMPLE_ACCESS_COUNTS_KEY, JSON.stringify(counts));
+}
+
+function getSampleAccessStatus(email) {
+  const normalizedEmail = normalizeSampleEmail(email);
+  const isUnlimited = normalizedEmail === SAMPLE_ACCESS_UNLIMITED_EMAIL;
+  const used = Number(loadSampleAccessCounts()[normalizedEmail] || 0);
+  const remaining = isUnlimited ? Infinity : Math.max(0, SAMPLE_ACCESS_LIMIT - used);
+
+  return {
+    allowed: isUnlimited || used < SAMPLE_ACCESS_LIMIT,
+    isUnlimited,
+    remaining,
+    used,
+  };
+}
+
+function recordSampleAccess(email) {
+  const normalizedEmail = normalizeSampleEmail(email);
+  if (!normalizedEmail || normalizedEmail === SAMPLE_ACCESS_UNLIMITED_EMAIL) {
+    return;
+  }
+
+  const counts = loadSampleAccessCounts();
+  counts[normalizedEmail] = Number(counts[normalizedEmail] || 0) + 1;
+  saveSampleAccessCounts(counts);
+}
+
+let accessCountdownTimer = null;
+
+function saveFullAccessSession({ email, phone, accessToken, expiresInSeconds, access = null }) {
+  const session = {
+    email: String(email || "").trim().toLowerCase(),
+    phone: String(phone || "").trim(),
+    accessToken: String(accessToken || "").trim(),
+    expiresAt: Date.now() + Math.max(0, Number(expiresInSeconds) || 0) * 1000,
+    access: access || null,
+  };
+  localStorage.setItem(FULL_ACCESS_KEY, JSON.stringify(session));
+  return session;
+}
+
+function loadFullAccessSession() {
+  try {
+    const raw = localStorage.getItem(FULL_ACCESS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+
+    if (!parsed?.accessToken || !parsed?.email || Number(parsed.expiresAt || 0) <= Date.now()) {
+      localStorage.removeItem(FULL_ACCESS_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    localStorage.removeItem(FULL_ACCESS_KEY);
+    return null;
+  }
+}
+
+async function postAccessGate(path, payload) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Access request failed.");
+  }
+
+  return data;
+}
+
+async function validateFullAccessSession() {
+  const session = loadFullAccessSession();
+  if (!session) {
+    return null;
+  }
+
+  try {
+    const validated = await postAccessGate("/api/access/validate-token", {
+      accessToken: session.accessToken,
+    });
+    const nextSession = {
+      ...session,
+      email: validated.email || session.email,
+      access: validated.access || session.access || null,
+    };
+    localStorage.setItem(FULL_ACCESS_KEY, JSON.stringify(nextSession));
+    renderAccessExpiration(nextSession.access);
+    return nextSession;
+  } catch {
+    localStorage.removeItem(FULL_ACCESS_KEY);
+    renderAccessExpiration(null);
+    return null;
+  }
+}
+
+function formatAccessCountdown(totalMilliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(totalMilliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) {
+    return `${days} day${days === 1 ? "" : "s"}, ${hours} hour${hours === 1 ? "" : "s"} remaining`;
+  }
+
+  if (hours > 0) {
+    return `${hours} hour${hours === 1 ? "" : "s"}, ${minutes} minute${minutes === 1 ? "" : "s"} remaining`;
+  }
+
+  return `${minutes} minute${minutes === 1 ? "" : "s"} remaining`;
+}
+
+function renderAccessExpiration(access) {
+  const panel = document.getElementById("access-expiration-panel");
+  const startDate = document.getElementById("access-start-date");
+  const expirationDate = document.getElementById("access-expiration-date");
+  const countdown = document.getElementById("access-countdown");
+
+  if (accessCountdownTimer) {
+    window.clearInterval(accessCountdownTimer);
+    accessCountdownTimer = null;
+  }
+
+  if (!panel || !access?.expiresAt) {
+    if (panel) {
+      panel.hidden = true;
+    }
+    return;
+  }
+
+  const expiresAt = new Date(access.expiresAt);
+  if (Number.isNaN(expiresAt.getTime())) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+  if (startDate) {
+    startDate.textContent = access.paymentDate ? `Access started: ${access.paymentDate}` : "Access start date: not listed";
+  }
+  if (expirationDate) {
+    expirationDate.textContent = `Access expires: ${access.expiresDate || expiresAt.toLocaleDateString()}`;
+  }
+
+  const updateCountdown = () => {
+    const remaining = expiresAt.getTime() - Date.now();
+    if (countdown) {
+      countdown.textContent = remaining <= 0 ? "Access expired" : formatAccessCountdown(remaining);
+    }
+  };
+
+  updateCountdown();
+  accessCountdownTimer = window.setInterval(updateCountdown, 60000);
 }
 
 function isLocalDesktopServer() {
@@ -417,6 +592,10 @@ function normalizeQuestionSourceUrl(url) {
     return url.replace("/pubhtml", "/pub?output=csv").replace(/\?.*$/, "?output=csv");
   }
 
+  if (url.includes("/gviz/tq")) {
+    return url;
+  }
+
   const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   if (!match) {
     return url;
@@ -600,11 +779,104 @@ function getQuestionKey(question) {
   return String(question?.bankKey || question?.id || "");
 }
 
+function loadSampleQuestionHistory() {
+  try {
+    const raw = localStorage.getItem(SAMPLE_QUESTION_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSampleQuestionHistory(questionKeys) {
+  const deduped = [];
+  const seen = new Set();
+
+  questionKeys
+    .filter(Boolean)
+    .map(String)
+    .reverse()
+    .forEach((questionKey) => {
+      if (!seen.has(questionKey)) {
+        seen.add(questionKey);
+        deduped.push(questionKey);
+      }
+    });
+
+  localStorage.setItem(
+    SAMPLE_QUESTION_HISTORY_KEY,
+    JSON.stringify(deduped.reverse().slice(-SAMPLE_QUESTION_HISTORY_LIMIT))
+  );
+}
+
+function recordSampleQuestions(questions) {
+  const nextHistory = [...loadSampleQuestionHistory(), ...questions.map(getQuestionKey)];
+  saveSampleQuestionHistory(nextHistory);
+}
+
+function loadFullQuestionHistory() {
+  try {
+    const raw = localStorage.getItem(FULL_QUESTION_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFullQuestionHistory(questionKeys) {
+  const deduped = [];
+  const seen = new Set();
+
+  questionKeys
+    .filter(Boolean)
+    .map(String)
+    .reverse()
+    .forEach((questionKey) => {
+      if (!seen.has(questionKey)) {
+        seen.add(questionKey);
+        deduped.push(questionKey);
+      }
+    });
+
+  localStorage.setItem(
+    FULL_QUESTION_HISTORY_KEY,
+    JSON.stringify(deduped.reverse().slice(-FULL_QUESTION_HISTORY_LIMIT))
+  );
+}
+
+function recordFullQuestions(questions) {
+  const nextHistory = [...loadFullQuestionHistory(), ...questions.map(getQuestionKey)];
+  saveFullQuestionHistory(nextHistory);
+}
+
+function getCryptoRandomInt(maxExclusive) {
+  if (!Number.isSafeInteger(maxExclusive) || maxExclusive <= 0) {
+    return 0;
+  }
+
+  const cryptoApi = window.crypto || window.msCrypto;
+  if (!cryptoApi?.getRandomValues) {
+    return Math.floor(Math.random() * maxExclusive);
+  }
+
+  const maxUint32 = 0x100000000;
+  const limit = maxUint32 - (maxUint32 % maxExclusive);
+  const values = new Uint32Array(1);
+
+  do {
+    cryptoApi.getRandomValues(values);
+  } while (values[0] >= limit);
+
+  return values[0] % maxExclusive;
+}
+
 function shuffleArray(items) {
   const shuffled = [...items];
 
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    const randomIndex = Math.floor(Math.random() * (i + 1));
+    const randomIndex = getCryptoRandomInt(i + 1);
     [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
   }
 
@@ -656,6 +928,60 @@ function selectQuestionsFromSourceMix(bank, questionCount, sourceMix) {
   if (selected.length < questionCount) {
     const leftovers = shuffleArray(bank.filter((question) => !usedIds.has(question.bankKey || question.id)));
     selected.push(...leftovers.slice(0, questionCount - selected.length));
+  }
+
+  return shuffleArray(selected).slice(0, Math.min(questionCount, bank.length));
+}
+
+function selectQuestionsFromWeightedSourceMix(bank, questionCount, sourceMix, excludedQuestionKeys = new Set()) {
+  if (!sourceMix.length) {
+    const unseenQuestions = bank.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
+    return shuffleArray(unseenQuestions.length ? unseenQuestions : bank).slice(0, Math.min(questionCount, bank.length));
+  }
+
+  const selected = [];
+  const usedIds = new Set();
+  const weightedRules = sourceMix
+    .map((rule) => ({
+      ...rule,
+      weight: Math.max(0, Number(rule.count) || 0),
+    }))
+    .filter((rule) => rule.weight);
+
+  for (let index = 0; index < questionCount; index += 1) {
+    const availableRules = weightedRules.filter((rule) =>
+      bank.some((question) => !usedIds.has(getQuestionKey(question)) && questionMatchesSourceRule(question, rule))
+    );
+
+    if (!availableRules.length) {
+      break;
+    }
+
+    const totalWeight = availableRules.reduce((sum, rule) => sum + rule.weight, 0);
+    let roll = getCryptoRandomInt(totalWeight);
+    const selectedRule =
+      availableRules.find((rule) => {
+        roll -= rule.weight;
+        return roll < 0;
+      }) || availableRules[availableRules.length - 1];
+
+    const matchingQuestions = bank.filter(
+      (question) => !usedIds.has(getQuestionKey(question)) && questionMatchesSourceRule(question, selectedRule)
+    );
+    const unseenMatchingQuestions = matchingQuestions.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
+    const selectedQuestion = shuffleArray(unseenMatchingQuestions.length ? unseenMatchingQuestions : matchingQuestions)[0];
+
+    if (selectedQuestion) {
+      selected.push(selectedQuestion);
+      usedIds.add(getQuestionKey(selectedQuestion));
+    }
+  }
+
+  if (selected.length < questionCount) {
+    const leftovers = bank.filter((question) => !usedIds.has(getQuestionKey(question)));
+    const unseenLeftovers = leftovers.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
+    const fallbackLeftovers = unseenLeftovers.length ? unseenLeftovers : leftovers;
+    selected.push(...shuffleArray(fallbackLeftovers).slice(0, questionCount - selected.length));
   }
 
   return shuffleArray(selected).slice(0, Math.min(questionCount, bank.length));
@@ -781,15 +1107,33 @@ function showIncompleteSubmitWarning(state) {
   return true;
 }
 
-async function startNewExam({ mode = "full", accountEmail = null } = {}) {
+async function startNewExam({ mode = "full", accountEmail = null, accessToken = null } = {}) {
   await loadQuestionBank();
   const startedAt = Date.now();
   const config = getConfig();
   const isSample = mode === "sample";
+  if (!isSample && !accessToken) {
+    throw new Error("Full exam access is not verified.");
+  }
+  if (isSample) {
+    const sampleAccess = getSampleAccessStatus(accountEmail);
+    if (!sampleAccess.allowed) {
+      throw new Error("This email has reached the 3 sample exam limit. Use full exam access to continue.");
+    }
+  }
   const questionCount = isSample ? config.sampleQuestionCount : config.fullQuestionCount;
   const durationSeconds = isSample ? config.sampleDurationSeconds : config.fullDurationSeconds;
-  const sourceMix = isSample ? [] : config.sourceMix;
-  const selectedQuestions = selectQuestionsFromSourceMix(questionBank, questionCount, sourceMix);
+  const sampleQuestionHistory = new Set(isSample ? loadSampleQuestionHistory() : []);
+  const fullQuestionHistory = new Set(isSample ? [] : loadFullQuestionHistory());
+  const selectedQuestions = isSample
+    ? selectQuestionsFromWeightedSourceMix(questionBank, questionCount, config.sourceMix, sampleQuestionHistory)
+    : selectQuestionsFromWeightedSourceMix(questionBank, questionCount, config.sourceMix, fullQuestionHistory);
+  if (isSample) {
+    recordSampleQuestions(selectedQuestions);
+    recordSampleAccess(accountEmail);
+  } else {
+    recordFullQuestions(selectedQuestions);
+  }
   const state = {
     startedAt,
     endsAt: startedAt + durationSeconds * 1000,
@@ -797,6 +1141,7 @@ async function startNewExam({ mode = "full", accountEmail = null } = {}) {
     questionCount,
     durationSeconds,
     accountEmail,
+    accessToken: isSample ? null : accessToken,
     currentQ: 0,
     examQuestions: selectedQuestions,
     userAnswers: {},
@@ -1048,6 +1393,10 @@ async function renderPreviewBookSetup() {
 
   if (onlineList) {
     onlineList.textContent = onlineBooks.map((book) => book.title).join(", ");
+    const onlineNote = onlineList.closest(".online-reference-note");
+    if (onlineNote) {
+      onlineNote.hidden = onlineBooks.length === 0;
+    }
   }
 
   if (!container) {
@@ -1308,28 +1657,149 @@ async function initStartPage() {
   const account = loadSampleAccount();
   const emailInput = document.getElementById("sample-email");
   const status = document.getElementById("sample-account-status");
+  const accessForm = document.getElementById("full-access-form");
+  const accessEmailInput = document.getElementById("access-email");
+  const accessPhoneInput = document.getElementById("access-phone");
+  const accessCodeInput = document.getElementById("access-code");
+  const accessStatus = document.getElementById("access-gate-status");
+  const requestCodeButton = document.getElementById("request-access-code");
+  const verifyCodeButton = document.getElementById("verify-access-code");
+  const fullAccessSession = loadFullAccessSession();
 
   if (account?.email && emailInput) {
     emailInput.value = account.email;
   }
 
-  document.getElementById("sample-account-form")?.addEventListener("submit", (event) => {
+  if (account?.email && accessEmailInput) {
+    accessEmailInput.value = account.email;
+  }
+
+  if (fullAccessSession) {
+    if (accessEmailInput) {
+      accessEmailInput.value = fullAccessSession.email;
+    }
+    if (accessPhoneInput) {
+      accessPhoneInput.value = fullAccessSession.phone || "";
+    }
+    if (accessStatus) {
+      accessStatus.dataset.tone = "success";
+      accessStatus.textContent = "Full exam access is verified on this device.";
+    }
+    renderAccessExpiration(fullAccessSession.access);
+    validateFullAccessSession().catch(() => {});
+  }
+
+  document.getElementById("sample-account-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const email = emailInput?.value || "";
 
-    if (status) {
-      status.textContent = "Loading question bank...";
+    if (!isValidEmail(email)) {
+      if (status) {
+        status.textContent = "Enter a valid email address to start the sample exam.";
+      }
+      emailInput?.focus();
+      return;
     }
 
-    const savedAccount = isValidEmail(email) ? saveSampleAccount(email) : null;
-    startNewExam({ mode: "sample", accountEmail: savedAccount?.email || null });
+    const sampleAccess = getSampleAccessStatus(email);
+    if (!sampleAccess.allowed) {
+      if (status) {
+        status.textContent = "This email has reached the 3 sample exam limit. Use full exam access to continue.";
+      }
+      return;
+    }
+
+    if (status) {
+      status.textContent = sampleAccess.isUnlimited
+        ? "Loading question bank..."
+        : `Loading question bank... ${sampleAccess.remaining} sample exam${sampleAccess.remaining === 1 ? "" : "s"} remaining.`;
+    }
+
+    const savedAccount = saveSampleAccount(email);
+    try {
+      await startNewExam({ mode: "sample", accountEmail: savedAccount.email });
+    } catch (error) {
+      if (status) {
+        status.textContent = error instanceof Error ? error.message : "Unable to start the sample exam.";
+      }
+    }
   });
 
-  document.getElementById("begin-full-exam")?.addEventListener("click", () => {
-    if (status) {
-      status.textContent = "Loading question bank...";
+  requestCodeButton?.addEventListener("click", async () => {
+    const email = accessEmailInput?.value || "";
+    const phone = accessPhoneInput?.value || "";
+
+    if (accessStatus) {
+      accessStatus.dataset.tone = "";
+      accessStatus.textContent = "Checking access list...";
     }
-    startNewExam({ mode: "full", accountEmail: account?.email || null });
+
+    if (!isValidEmail(email)) {
+      if (accessStatus) {
+        accessStatus.textContent = "Enter the email address from the access list.";
+      }
+      return;
+    }
+
+    requestCodeButton.disabled = true;
+    try {
+      await postAccessGate("/api/access/request-code", { email, phone });
+      saveSampleAccount(email);
+      if (accessStatus) {
+        accessStatus.dataset.tone = "success";
+        accessStatus.textContent = "Access code sent by text. Enter the 6-digit code to start.";
+      }
+      accessCodeInput?.focus();
+    } catch (error) {
+      if (accessStatus) {
+        accessStatus.dataset.tone = "";
+        accessStatus.textContent = error instanceof Error ? error.message : "Unable to send access code.";
+      }
+    } finally {
+      requestCodeButton.disabled = false;
+    }
+  });
+
+  accessForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = accessEmailInput?.value || "";
+    const phone = accessPhoneInput?.value || "";
+    const code = accessCodeInput?.value || "";
+
+    if (accessStatus) {
+      accessStatus.dataset.tone = "";
+      accessStatus.textContent = "Verifying code...";
+    }
+
+    if (verifyCodeButton) {
+      verifyCodeButton.disabled = true;
+    }
+    try {
+      const verified = await postAccessGate("/api/access/verify-code", { email, phone, code });
+      const session = saveFullAccessSession({
+        email: verified.email || email,
+        phone,
+        accessToken: verified.accessToken,
+        expiresInSeconds: verified.expiresInSeconds,
+        access: verified.access || null,
+      });
+      renderAccessExpiration(session.access);
+      saveSampleAccount(session.email);
+      if (accessStatus) {
+        accessStatus.dataset.tone = "success";
+        accessStatus.textContent = "Access verified. Loading full exam...";
+      }
+      await startNewExam({ mode: "full", accountEmail: session.email, accessToken: session.accessToken });
+    } catch (error) {
+      if (accessStatus) {
+        accessStatus.dataset.tone = "";
+        accessStatus.textContent = error instanceof Error ? error.message : "Unable to verify access.";
+      }
+    } finally {
+      if (verifyCodeButton) {
+        verifyCodeButton.disabled = false;
+      }
+    }
   });
 
   document.getElementById("start-score-link")?.addEventListener("click", () => {

@@ -8,9 +8,6 @@
   </head>
   <body data-page="start">
     <main class="hero">
-      <div class="purchase-action">
-        <button id="begin-full-exam" type="button" class="btn btn-secondary">Start Full Exam <span>$30</span></button>
-      </div>
       <section class="card hero-card">
         <div class="hero-icon">📘</div>
         <p class="eyebrow">Elevator Inspector Exam SIM</p>
@@ -25,8 +22,36 @@
             <input id="sample-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
             <button class="btn btn-primary" type="submit">Start Sample Exam</button>
           </div>
-          <p class="form-helper">Email capture is bypassed while the simulator is under construction.</p>
+          <p class="form-helper">Enter an email address to start the sample exam. Unsubscribed emails are limited to 3 sample exams.</p>
           <p id="sample-account-status" class="form-status" aria-live="polite"></p>
+        </form>
+        <form id="full-access-form" class="sample-account-form access-gate-form">
+          <div>
+            <p class="eyebrow">Full Exam Access</p>
+            <h2>$30 for 30 days of full exam access</h2>
+          </div>
+          <div class="payment-link-row" aria-label="Payment options">
+            <a class="btn btn-secondary" href="https://buy.stripe.com/test_5kQ00jatJ3vhepC4n53Nm00" target="_blank" rel="noopener">Pay with Stripe</a>
+          </div>
+          <p class="form-helper">After payment, use the same email and phone here to request your access code.</p>
+          <label for="access-email">Email address</label>
+          <div class="access-grid">
+            <input id="access-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+            <input id="access-phone" name="phone" type="tel" autocomplete="tel" placeholder="Phone for SMS code" />
+            <button id="request-access-code" class="btn btn-secondary" type="button">Text Code</button>
+          </div>
+          <label for="access-code">6-digit code</label>
+          <div class="access-grid access-code-grid">
+            <input id="access-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
+            <button id="verify-access-code" class="btn btn-primary" type="submit">Start Full Exam</button>
+          </div>
+          <p class="form-helper">Use the email and phone from the access list. Codes expire in 10 minutes.</p>
+          <div id="access-expiration-panel" class="access-expiration-panel" hidden>
+            <span id="access-start-date"></span>
+            <span id="access-expiration-date"></span>
+            <strong id="access-countdown"></strong>
+          </div>
+          <p id="access-gate-status" class="form-status" aria-live="polite"></p>
         </form>
         <section class="book-setup">
           <div class="book-setup-header">

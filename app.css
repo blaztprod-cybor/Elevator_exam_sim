@@ -199,7 +199,8 @@ a {
   gap: 10px;
 }
 
-.email-entry input {
+.email-entry input,
+.access-grid input {
   width: 100%;
   min-height: 52px;
   border: 1px solid var(--line);
@@ -208,6 +209,58 @@ a {
   font: inherit;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.9);
+}
+
+.access-gate-form {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.access-gate-form h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.payment-link-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.payment-link-row .btn {
+  min-height: 48px;
+  padding-inline: 14px;
+}
+
+.access-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.access-code-grid {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.form-status[data-tone="success"] {
+  color: var(--success);
+}
+
+.access-expiration-panel {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(21, 128, 61, 0.22);
+  border-radius: 16px;
+  background: rgba(21, 128, 61, 0.08);
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.access-expiration-panel strong {
+  color: var(--success);
 }
 
 .form-status {
@@ -826,6 +879,8 @@ a {
   .question-meta,
   .nav-row,
   .email-entry,
+  .payment-link-row,
+  .access-grid,
   .book-setup-row {
     grid-template-columns: 1fr;
     display: grid;
