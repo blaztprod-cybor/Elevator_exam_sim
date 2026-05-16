@@ -31,9 +31,7 @@ const books = [
   { title: "NYC Building Code Chapter 11", key: "nyc-bc-chapter-11", path: "./reference-pdfs/nyc/nyc-building-code-chapter-11.pdf", requiresLocalCopy: true },
   { title: "NYC Building Code Chapter 30", key: "nyc-bc-chapter-30", path: "./reference-pdfs/nyc/nyc-building-code-chapter-30.pdf", requiresLocalCopy: true },
   { title: "NYC Building Code Chapter 33", key: "nyc-chapter-33", path: "./reference-pdfs/nyc/2022BC_Chapter33_Con_DemoSafetyWBwm.pdf", requiresLocalCopy: true },
-  { title: "Appendix K1", key: "appendix-k1", path: "./reference-pdfs/nyc/appendix-k1.pdf", requiresLocalCopy: true },
-  { title: "Appendix K2", key: "appendix-k2", path: "./reference-pdfs/nyc/appendix-k2.pdf", requiresLocalCopy: true },
-  { title: "Appendix K3", key: "appendix-k3", path: "./reference-pdfs/nyc/appendix-k3.pdf", requiresLocalCopy: true },
+  { title: "Appendix K1, K2, and K3", key: "appendix-k1", path: "./reference-pdfs/nyc/appendix-k1.pdf", requiresLocalCopy: true },
   { title: "Appendix K4", key: "appendix-k4", path: "./reference-pdfs/nyc/appendix-k4.pdf", requiresLocalCopy: true },
   { title: "NYC Electrical Code 2011", key: "nyc-electrical-code", path: "./reference-pdfs/nyc/Electrical-Code-Local-Law-39of2011.pdf", requiresLocalCopy: true },
 ];
