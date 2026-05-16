@@ -19,8 +19,8 @@ const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
 const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
 
 const books = [
-  { title: "ASME A17.1-2013", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
-  { title: "ASME A17.2-2014", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
+  { title: "ASME A17.1-2004", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
+  { title: "ASME A17.2-2010", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
   { title: "ASME A17.3-2015", key: "a17-3", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
   { title: "ASME A17.5-2004", key: "a17-5", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
   { title: "ASME A90.1-2009", key: "asme-a90-1", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
