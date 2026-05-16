@@ -1419,10 +1419,10 @@ async function renderPreviewBookSetup() {
       : `
         <div>
           <strong>${book.title}</strong>
-          <span class="book-link-status">No PDF selected</span>
+          <span class="book-link-status">No PDF linked</span>
         </div>
         <label class="btn btn-secondary setup-reference-book">
-          Choose PDF
+          Link PDF
           <input type="file" accept="application/pdf" hidden>
         </label>
       `;
@@ -1442,7 +1442,7 @@ async function renderPreviewBookSetup() {
       row.querySelector("button")?.addEventListener("click", async () => {
         const button = row.querySelector("button");
         button.disabled = true;
-        button.textContent = "Choose PDF...";
+        button.textContent = "Linking...";
 
         try {
           const linked = await linkReferenceBook(book);
