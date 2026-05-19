@@ -1,4 +1,4 @@
-const CACHE_VERSION = "elevator-exam-pwa-v3";
+const CACHE_VERSION = "elevator-exam-pwa-v4";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -10,7 +10,7 @@ const APP_SHELL_URLS = [
   "./review.html",
   "./results.html",
   "./viewer.html",
-  "./app.css?v=20260519-install-links",
+  "./app.css?v=20260519-header",
   "./config.js?v=20260515-render-deploy",
   "./app.js?v=20260519-pwa",
   "./pwa-register.js?v=20260519-install-links",
@@ -55,7 +55,7 @@ function isShellRequest(request) {
 }
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request, { ignoreSearch: true });
+  const cached = await caches.match(request);
   if (cached) {
     return cached;
   }
