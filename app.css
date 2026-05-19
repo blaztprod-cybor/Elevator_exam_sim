@@ -169,66 +169,29 @@ a {
 }
 
 .install-panel {
-  margin: 28px auto 0;
-  padding: 22px;
+  margin: 22px auto 0;
+  padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.62);
   text-align: left;
 }
 
-.install-panel-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.install-panel-heading h2 {
-  margin: 0;
-  font-size: 1.35rem;
-}
-
-.install-grid {
+.compact-install-panel {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.install-card {
-  display: grid;
+  justify-items: center;
   gap: 8px;
-  align-content: start;
-  min-height: 150px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
 }
 
-.install-card strong {
-  font-size: 1rem;
-}
-
-.install-card span {
-  min-height: 36px;
-  color: var(--muted);
-  font-size: 0.88rem;
-  line-height: 1.35;
-}
-
-.install-card .btn {
-  width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
+.compact-install-panel .btn {
+  min-height: 44px;
+  padding: 10px 18px;
   border-radius: 14px;
-  font-size: 0.92rem;
 }
 
 .install-status {
-  margin: 12px 0 0;
+  margin: 0;
+  text-align: center;
 }
 
 .ios-install-help {
@@ -1032,10 +995,6 @@ a {
 
   .install-panel {
     padding: 16px;
-  }
-
-  .install-grid {
-    grid-template-columns: 1fr;
   }
 
   .topbar,

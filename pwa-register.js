@@ -7,8 +7,21 @@
   let installButton = null;
   let statusNode = null;
 
+  function isStandaloneApp() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+
   function installTargets() {
     return Array.from(document.querySelectorAll(".pwa-install-trigger, .pwa-install-button")).filter(Boolean);
+  }
+
+  function setInstallButtonState(installed) {
+    installTargets().forEach((button) => {
+      if (!button.classList.contains("pwa-install-button")) {
+        button.textContent = installed ? "App Installed" : "App Download Link";
+      }
+      button.disabled = installed;
+    });
   }
 
   function ensureBanner() {
@@ -40,21 +53,25 @@
   }
 
   async function requestInstall() {
+    if (isStandaloneApp()) {
+      setInstallButtonState(true);
+      setStatus("App installed.");
+      return;
+    }
+
     if (!deferredInstallPrompt) {
       setStatus("Use your browser menu to install, or on iOS use Safari Share then Add to Home Screen.");
       return;
     }
 
     deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
+    const choice = await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
-    installTargets().forEach((button) => {
-      if (button.classList.contains("pwa-install-button")) {
-        button.hidden = true;
-      } else {
-        button.disabled = true;
-      }
-    });
+    const installed = choice?.outcome === "accepted";
+    setInstallButtonState(installed);
+    if (installed && installButton) {
+      installButton.hidden = true;
+    }
   }
 
   function bindInstallButtons() {
@@ -69,6 +86,13 @@
   }
 
   function updateOnlineStatus() {
+    if (isStandaloneApp()) {
+      setInstallButtonState(true);
+      setStatus("App installed.");
+      return;
+    }
+
+    setInstallButtonState(false);
     if (navigator.onLine) {
       setStatus("Ready for offline practice after first load.");
     } else {
@@ -85,6 +109,16 @@
       button.hidden = false;
       button.disabled = false;
     });
+    setInstallButtonState(isStandaloneApp());
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    setInstallButtonState(true);
+    setStatus("App installed.");
+    if (installButton) {
+      installButton.hidden = true;
+    }
   });
 
   window.addEventListener("online", updateOnlineStatus);

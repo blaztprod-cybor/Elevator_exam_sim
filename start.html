@@ -8,7 +8,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/icon.svg" />
-    <link rel="stylesheet" href="./app.css?v=20260519-pdf-search" />
+    <link rel="stylesheet" href="./app.css?v=20260519-compact-install" />
   </head>
   <body data-page="start">
     <main class="hero">
@@ -21,33 +21,8 @@
           The full simulator is 50 questions with a 3 hour timer. Download the browser app to enable
           access to reference books on your device.
         </p>
-        <section class="install-panel" aria-labelledby="install-app-title">
-          <div class="install-panel-heading">
-            <p class="eyebrow">Install App</p>
-            <h2 id="install-app-title">Download to your device</h2>
-          </div>
-          <div class="install-grid">
-            <article class="install-card">
-              <strong>Mac</strong>
-              <span>Chrome, Edge, or Safari</span>
-              <button class="btn btn-secondary pwa-install-trigger" type="button">Install for Mac</button>
-            </article>
-            <article class="install-card">
-              <strong>Windows PC</strong>
-              <span>Chrome or Edge</span>
-              <button class="btn btn-secondary pwa-install-trigger" type="button">Install for PC</button>
-            </article>
-            <article class="install-card">
-              <strong>iPhone / iPad</strong>
-              <span>Safari share menu</span>
-              <a class="btn btn-secondary" href="#ios-install-help">iOS Steps</a>
-            </article>
-            <article class="install-card">
-              <strong>Android</strong>
-              <span>Chrome install prompt</span>
-              <button class="btn btn-secondary pwa-install-trigger" type="button">Install for Android</button>
-            </article>
-          </div>
+        <section class="install-panel compact-install-panel" aria-label="App download">
+          <button id="app-download-link" class="btn btn-secondary pwa-install-trigger" type="button">App Download Link</button>
           <p id="install-app-status" class="form-status install-status" aria-live="polite"></p>
           <details id="ios-install-help" class="ios-install-help">
             <summary>iOS install steps</summary>
@@ -109,6 +84,6 @@
     </main>
     <script src="./config.js?v=20260515-render-deploy"></script>
     <script src="./app.js?v=20260519-pdf-search"></script>
-    <script src="./pwa-register.js?v=20260519-install-links"></script>
+    <script src="./pwa-register.js?v=20260519-compact-install"></script>
   </body>
   </html>
