@@ -1586,6 +1586,12 @@ async function openReferenceBook(book) {
     return;
   }
 
+  const inlinePanel = document.getElementById("exam-reference-panel");
+  if (inlinePanel && !book.online) {
+    await openInlineReferenceBook(book);
+    return;
+  }
+
   if (book.online) {
     window.open(book.path, "_blank", "noopener");
     return;
@@ -1617,6 +1623,53 @@ async function openReferenceBook(book) {
   }
 
   window.open(`./viewer.html?book=${encodeURIComponent(book.key)}`, "_blank", "noopener");
+}
+
+async function openInlineReferenceBook(book) {
+  const panel = document.getElementById("exam-reference-panel");
+  const title = document.getElementById("pdf-title");
+  const status = document.getElementById("pdf-status");
+
+  if (!panel) {
+    return;
+  }
+
+  panel.hidden = false;
+  document.body.classList.add("reference-open");
+
+  if (title) {
+    title.textContent = book.title;
+  }
+  if (status) {
+    status.textContent = "Loading selected reference book...";
+  }
+
+  try {
+    const record = await loadSessionPdf(book.key);
+
+    if (!record?.file) {
+      if (status) {
+        status.textContent = "This PDF was not selected on the opening screen.";
+      }
+      return;
+    }
+
+    await preparePdfFromFile(record.file);
+  } catch {
+    if (status) {
+      status.textContent = "Could not open this PDF from local browser storage.";
+    }
+  }
+}
+
+function bindInlineReferencePanel() {
+  document.getElementById("close-reference-panel")?.addEventListener("click", () => {
+    const panel = document.getElementById("exam-reference-panel");
+    if (panel) {
+      panel.hidden = true;
+    }
+    document.body.classList.remove("reference-open");
+  });
 }
 
 function bindReferenceButtons() {
@@ -1952,6 +2005,9 @@ async function initExamPage() {
   }
 
   bindReferenceButtons();
+  bindPdfPageButtons();
+  bindPdfSearch();
+  bindInlineReferencePanel();
   await updateReferenceStatuses();
 
   const timer = document.getElementById("timer");
