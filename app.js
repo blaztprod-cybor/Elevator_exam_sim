@@ -386,7 +386,29 @@ async function loadPdfJsModule() {
   return pdfJsModule;
 }
 
-async function renderActivePdfPage() {
+function getPdfViewportAnchor() {
+  const viewer = document.getElementById("pdf-js-viewer");
+  if (!viewer || !viewer.scrollHeight || !viewer.scrollWidth) {
+    return null;
+  }
+
+  return {
+    xRatio: (viewer.scrollLeft + viewer.clientWidth / 2) / viewer.scrollWidth,
+    yRatio: (viewer.scrollTop + viewer.clientHeight / 2) / viewer.scrollHeight,
+  };
+}
+
+function restorePdfViewportAnchor(anchor) {
+  const viewer = document.getElementById("pdf-js-viewer");
+  if (!viewer || !anchor) {
+    return;
+  }
+
+  viewer.scrollLeft = Math.max(0, anchor.xRatio * viewer.scrollWidth - viewer.clientWidth / 2);
+  viewer.scrollTop = Math.max(0, anchor.yRatio * viewer.scrollHeight - viewer.clientHeight / 2);
+}
+
+async function renderActivePdfPage({ preserveViewport = false, scrollToPage = false } = {}) {
   if (!activePdfDocument) {
     return;
   }
@@ -400,6 +422,8 @@ async function renderActivePdfPage() {
   if (!pagesContainer) {
     return;
   }
+
+  const viewportAnchor = preserveViewport ? getPdfViewportAnchor() : null;
 
   if (activePdfRenderTask) {
     activePdfRenderTask.cancel();
@@ -454,7 +478,11 @@ async function renderActivePdfPage() {
     }
   }
 
-  scrollToActivePdfPage();
+  if (preserveViewport) {
+    restorePdfViewportAnchor(viewportAnchor);
+  } else if (scrollToPage) {
+    scrollToActivePdfPage();
+  }
 }
 
 function scrollToActivePdfPage() {
@@ -518,7 +546,7 @@ async function goToPdfSearchResult(index) {
   activePdfSearchIndex = ((index % activePdfSearchResults.length) + activePdfSearchResults.length) % activePdfSearchResults.length;
   const result = activePdfSearchResults[activePdfSearchIndex];
   activePdfPageNumber = result.pageNumber;
-  await renderActivePdfPage();
+  await renderActivePdfPage({ scrollToPage: true });
   updatePdfSearchCount();
   updatePdfSearchStatus(`Match ${activePdfSearchIndex + 1} of ${activePdfSearchResults.length} on page ${result.pageNumber}.`);
 }
@@ -608,7 +636,7 @@ async function loadPdfFileIntoCanvas(file) {
     canvasViewer.hidden = false;
   }
 
-  await renderActivePdfPage();
+  await renderActivePdfPage({ scrollToPage: true });
 
   if (status) {
     status.textContent = "Loaded from this device for the current browser session.";
@@ -1755,7 +1783,7 @@ function bindPdfPageButtons() {
     }
 
     activePdfPageNumber -= 1;
-    await renderActivePdfPage();
+    await renderActivePdfPage({ scrollToPage: true });
   });
 
   nextButton?.addEventListener("click", async () => {
@@ -1764,7 +1792,7 @@ function bindPdfPageButtons() {
     }
 
     activePdfPageNumber += 1;
-    await renderActivePdfPage();
+    await renderActivePdfPage({ scrollToPage: true });
   });
 }
 
@@ -1774,12 +1802,12 @@ function bindPdfZoomButtons() {
 
   zoomOutButton?.addEventListener("click", async () => {
     activePdfZoom = Math.max(0.6, Number((activePdfZoom - 0.15).toFixed(2)));
-    await renderActivePdfPage();
+    await renderActivePdfPage({ preserveViewport: true });
   });
 
   zoomInButton?.addEventListener("click", async () => {
     activePdfZoom = Math.min(2.5, Number((activePdfZoom + 0.15).toFixed(2)));
-    await renderActivePdfPage();
+    await renderActivePdfPage({ preserveViewport: true });
   });
 }
 
