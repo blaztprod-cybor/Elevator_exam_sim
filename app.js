@@ -98,6 +98,7 @@ let activePdfPageNumber = 1;
 let activePdfRenderTask = null;
 let activePdfSearchResults = [];
 let activePdfSearchIndex = -1;
+let activePdfZoom = 1;
 
 function openSessionPdfDb() {
   return new Promise((resolve, reject) => {
@@ -390,12 +391,13 @@ async function renderActivePdfPage() {
     return;
   }
 
-  const canvas = document.getElementById("pdf-canvas");
+  const pagesContainer = document.getElementById("pdf-pages");
   const pageStatus = document.getElementById("pdf-page-status");
   const previousButton = document.getElementById("pdf-prev-page");
   const nextButton = document.getElementById("pdf-next-page");
+  const zoomStatus = document.getElementById("pdf-zoom-status");
 
-  if (!canvas) {
+  if (!pagesContainer) {
     return;
   }
 
@@ -404,19 +406,15 @@ async function renderActivePdfPage() {
     activePdfRenderTask = null;
   }
 
-  const page = await activePdfDocument.getPage(activePdfPageNumber);
   const container = document.getElementById("pdf-js-viewer");
   const availableWidth = Math.max(320, (container?.clientWidth || 720) - 24);
-  const baseViewport = page.getViewport({ scale: 1 });
-  const scale = availableWidth / baseViewport.width;
-  const viewport = page.getViewport({ scale });
-  const context = canvas.getContext("2d");
-
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
+  pagesContainer.innerHTML = "";
 
   if (pageStatus) {
     pageStatus.textContent = `Page ${activePdfPageNumber} / ${activePdfDocument.numPages}`;
+  }
+  if (zoomStatus) {
+    zoomStatus.textContent = `${Math.round(activePdfZoom * 100)}%`;
   }
 
   if (previousButton) {
@@ -427,17 +425,41 @@ async function renderActivePdfPage() {
     nextButton.disabled = activePdfPageNumber >= activePdfDocument.numPages;
   }
 
-  activePdfRenderTask = page.render({ canvasContext: context, viewport });
+  for (let pageNumber = 1; pageNumber <= activePdfDocument.numPages; pageNumber += 1) {
+    const page = await activePdfDocument.getPage(pageNumber);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = (availableWidth / baseViewport.width) * activePdfZoom;
+    const viewport = page.getViewport({ scale });
+    const pageShell = document.createElement("div");
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
 
-  try {
-    await activePdfRenderTask.promise;
-  } catch (error) {
-    if (error?.name !== "RenderingCancelledException") {
-      throw error;
+    pageShell.className = "pdf-page-shell";
+    pageShell.dataset.pageNumber = String(pageNumber);
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    pageShell.appendChild(canvas);
+    pagesContainer.appendChild(pageShell);
+
+    activePdfRenderTask = page.render({ canvasContext: context, viewport });
+
+    try {
+      await activePdfRenderTask.promise;
+    } catch (error) {
+      if (error?.name !== "RenderingCancelledException") {
+        throw error;
+      }
+    } finally {
+      activePdfRenderTask = null;
     }
-  } finally {
-    activePdfRenderTask = null;
   }
+
+  scrollToActivePdfPage();
+}
+
+function scrollToActivePdfPage() {
+  const pageShell = document.querySelector(`.pdf-page-shell[data-page-number="${activePdfPageNumber}"]`);
+  pageShell?.scrollIntoView({ block: "start", inline: "nearest" });
 }
 
 function normalizePdfSearchText(value) {
@@ -573,6 +595,7 @@ async function loadPdfFileIntoCanvas(file) {
 
   activePdfDocument = await pdfjs.getDocument({ data: bytes }).promise;
   activePdfPageNumber = 1;
+  activePdfZoom = 1;
   activePdfSearchResults = [];
   activePdfSearchIndex = -1;
   updatePdfSearchCount();
@@ -1745,6 +1768,21 @@ function bindPdfPageButtons() {
   });
 }
 
+function bindPdfZoomButtons() {
+  const zoomOutButton = document.getElementById("pdf-zoom-out");
+  const zoomInButton = document.getElementById("pdf-zoom-in");
+
+  zoomOutButton?.addEventListener("click", async () => {
+    activePdfZoom = Math.max(0.6, Number((activePdfZoom - 0.15).toFixed(2)));
+    await renderActivePdfPage();
+  });
+
+  zoomInButton?.addEventListener("click", async () => {
+    activePdfZoom = Math.min(2.5, Number((activePdfZoom + 0.15).toFixed(2)));
+    await renderActivePdfPage();
+  });
+}
+
 function bindPdfSearch() {
   const searchForm = document.getElementById("pdf-search-form");
   const searchInput = document.getElementById("pdf-search-input");
@@ -1777,6 +1815,7 @@ function bindPdfSearch() {
 
 async function initViewerPage() {
   bindPdfPageButtons();
+  bindPdfZoomButtons();
   bindPdfSearch();
 
   const params = new URLSearchParams(window.location.search);
@@ -2059,6 +2098,7 @@ async function initExamPage() {
 
   bindReferenceButtons();
   bindPdfPageButtons();
+  bindPdfZoomButtons();
   bindPdfSearch();
   bindInlineReferencePanel();
   await updateReferenceStatuses();
