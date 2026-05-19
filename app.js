@@ -99,6 +99,7 @@ let activePdfRenderTask = null;
 let activePdfSearchResults = [];
 let activePdfSearchIndex = -1;
 let activePdfZoom = 1;
+let activePdfSearchQuery = "";
 
 function openSessionPdfDb() {
   return new Promise((resolve, reject) => {
@@ -456,13 +457,16 @@ async function renderActivePdfPage({ preserveViewport = false, scrollToPage = fa
     const viewport = page.getViewport({ scale });
     const pageShell = document.createElement("div");
     const canvas = document.createElement("canvas");
+    const highlightLayer = document.createElement("div");
     const context = canvas.getContext("2d");
 
     pageShell.className = "pdf-page-shell";
     pageShell.dataset.pageNumber = String(pageNumber);
+    highlightLayer.className = "pdf-highlight-layer";
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
     pageShell.appendChild(canvas);
+    pageShell.appendChild(highlightLayer);
     pagesContainer.appendChild(pageShell);
 
     activePdfRenderTask = page.render({ canvasContext: context, viewport });
@@ -476,6 +480,8 @@ async function renderActivePdfPage({ preserveViewport = false, scrollToPage = fa
     } finally {
       activePdfRenderTask = null;
     }
+
+    renderPdfHighlightsForPage(pageNumber, viewport, highlightLayer);
   }
 
   if (preserveViewport) {
@@ -483,6 +489,32 @@ async function renderActivePdfPage({ preserveViewport = false, scrollToPage = fa
   } else if (scrollToPage) {
     scrollToActivePdfPage();
   }
+}
+
+function renderPdfHighlightsForPage(pageNumber, viewport, highlightLayer) {
+  const pageResults = activePdfSearchResults.filter((result) => result.pageNumber === pageNumber);
+  if (!pageResults.length) {
+    return;
+  }
+
+  pageResults.forEach((result, pageResultIndex) => {
+    const [x, y, width, height] = viewport.convertToViewportRectangle(result.rect);
+    const left = Math.min(x, width);
+    const top = Math.min(y, height);
+    const highlight = document.createElement("span");
+
+    highlight.className = "pdf-search-highlight";
+    if (activePdfSearchResults[activePdfSearchIndex] === result) {
+      highlight.classList.add("active");
+    }
+    highlight.dataset.searchIndex = String(activePdfSearchResults.indexOf(result));
+    highlight.style.left = `${left}px`;
+    highlight.style.top = `${top}px`;
+    highlight.style.width = `${Math.abs(width - x)}px`;
+    highlight.style.height = `${Math.abs(height - y)}px`;
+    highlight.title = `Match ${pageResultIndex + 1} on page ${pageNumber}`;
+    highlightLayer.appendChild(highlight);
+  });
 }
 
 function scrollToActivePdfPage() {
@@ -538,6 +570,38 @@ async function extractPdfPageText(pageNumber) {
   return textContent.items.map((item) => item.str || "").join(" ");
 }
 
+async function extractPdfPageSearchResults(pageNumber, query) {
+  const page = await activePdfDocument.getPage(pageNumber);
+  const textContent = await page.getTextContent();
+  const normalizedQuery = normalizePdfSearchText(query);
+  const results = [];
+
+  textContent.items.forEach((item) => {
+    const text = String(item.str || "");
+    const normalizedText = normalizePdfSearchText(text);
+    if (!normalizedText.includes(normalizedQuery)) {
+      return;
+    }
+
+    const transform = item.transform || [1, 0, 0, 1, 0, 0];
+    const x = Number(transform[4] || 0);
+    const y = Number(transform[5] || 0);
+    const width = Math.max(8, Number(item.width || 0));
+    const height = Math.max(8, Number(item.height || Math.abs(transform[3]) || 10));
+    const occurrenceCount = countPdfSearchOccurrences(normalizedText, normalizedQuery);
+
+    for (let occurrenceIndex = 0; occurrenceIndex < occurrenceCount; occurrenceIndex += 1) {
+      results.push({
+        pageNumber,
+        occurrenceIndex,
+        rect: [x, y, x + width, y + height],
+      });
+    }
+  });
+
+  return results;
+}
+
 async function goToPdfSearchResult(index) {
   if (!activePdfSearchResults.length) {
     return;
@@ -547,8 +611,14 @@ async function goToPdfSearchResult(index) {
   const result = activePdfSearchResults[activePdfSearchIndex];
   activePdfPageNumber = result.pageNumber;
   await renderActivePdfPage({ scrollToPage: true });
+  scrollToActivePdfSearchResult();
   updatePdfSearchCount();
   updatePdfSearchStatus(`Match ${activePdfSearchIndex + 1} of ${activePdfSearchResults.length} on page ${result.pageNumber}.`);
+}
+
+function scrollToActivePdfSearchResult() {
+  const activeHighlight = document.querySelector(`.pdf-search-highlight[data-search-index="${activePdfSearchIndex}"]`);
+  activeHighlight?.scrollIntoView({ block: "center", inline: "center" });
 }
 
 async function searchActivePdf(query) {
@@ -559,6 +629,7 @@ async function searchActivePdf(query) {
 
   activePdfSearchResults = [];
   activePdfSearchIndex = -1;
+  activePdfSearchQuery = normalizedQuery;
   updatePdfSearchCount();
 
   if (!activePdfDocument) {
@@ -585,11 +656,7 @@ async function searchActivePdf(query) {
 
   try {
     for (let pageNumber = 1; pageNumber <= activePdfDocument.numPages; pageNumber += 1) {
-      const pageText = normalizePdfSearchText(await extractPdfPageText(pageNumber));
-      const occurrenceCount = countPdfSearchOccurrences(pageText, normalizedQuery);
-      for (let occurrenceIndex = 0; occurrenceIndex < occurrenceCount; occurrenceIndex += 1) {
-        activePdfSearchResults.push({ pageNumber, occurrenceIndex });
-      }
+      activePdfSearchResults.push(...(await extractPdfPageSearchResults(pageNumber, normalizedQuery)));
     }
 
     if (!activePdfSearchResults.length) {
@@ -626,6 +693,7 @@ async function loadPdfFileIntoCanvas(file) {
   activePdfZoom = 1;
   activePdfSearchResults = [];
   activePdfSearchIndex = -1;
+  activePdfSearchQuery = "";
   updatePdfSearchCount();
 
   if (viewer) {

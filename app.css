@@ -742,12 +742,31 @@ body.reference-open .exam-layout {
 }
 
 .pdf-page-shell {
+  position: relative;
   background: #fff;
   box-shadow: 0 6px 18px rgba(16, 35, 63, 0.12);
 }
 
 .pdf-page-shell canvas {
   display: block;
+}
+
+.pdf-highlight-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pdf-search-highlight {
+  position: absolute;
+  border-radius: 2px;
+  background: rgba(255, 230, 0, 0.48);
+  outline: 1px solid rgba(176, 143, 0, 0.35);
+}
+
+.pdf-search-highlight.active {
+  background: rgba(255, 199, 0, 0.72);
+  outline: 2px solid rgba(176, 103, 0, 0.75);
 }
 
 #pdf-viewer {
