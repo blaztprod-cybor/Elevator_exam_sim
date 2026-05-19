@@ -55,27 +55,6 @@
           </div>
         </aside>
 
-        <section class="card exam-panel">
-          <div id="submit-warning" class="submit-warning" hidden></div>
-          <div class="question-meta">
-            <div>
-              <span class="muted">Question</span>
-              <strong id="q-number" style="font-size: 2.2rem; margin-left: 8px;">1</strong>
-              <span class="muted">/ <span id="total-questions">50</span></span>
-            </div>
-            <div id="review-status" class="muted">2 points each</div>
-          </div>
-
-          <div id="current-question" class="question-card"></div>
-
-          <div class="nav-row">
-            <button id="prev-question" class="btn btn-secondary">Previous</button>
-            <button id="mark-review" class="btn btn-secondary">Mark For Review</button>
-            <a href="./review.html" id="go-to-review" class="btn btn-secondary">Go To Review</a>
-            <button id="next-question" class="btn btn-primary">Next</button>
-          </div>
-        </section>
-
         <section id="exam-reference-panel" class="card pdf-panel exam-reference-panel" hidden>
           <div class="pdf-panel-header">
             <div>
@@ -102,6 +81,27 @@
             <canvas id="pdf-canvas"></canvas>
           </div>
           <p id="pdf-status" class="pdf-status">Choose a reference book from the left.</p>
+        </section>
+
+        <section class="card exam-panel">
+          <div id="submit-warning" class="submit-warning" hidden></div>
+          <div class="question-meta">
+            <div>
+              <span class="muted">Question</span>
+              <strong id="q-number" style="font-size: 2.2rem; margin-left: 8px;">1</strong>
+              <span class="muted">/ <span id="total-questions">50</span></span>
+            </div>
+            <div id="review-status" class="muted">2 points each</div>
+          </div>
+
+          <div id="current-question" class="question-card"></div>
+
+          <div class="nav-row">
+            <button id="prev-question" class="btn btn-secondary">Previous</button>
+            <button id="mark-review" class="btn btn-secondary">Mark For Review</button>
+            <a href="./review.html" id="go-to-review" class="btn btn-secondary">Go To Review</a>
+            <button id="next-question" class="btn btn-primary">Next</button>
+          </div>
         </section>
       </main>
     </div>

@@ -1039,6 +1039,14 @@ body.reference-open .exam-layout {
     grid-template-columns: 1fr;
   }
 
+  body.reference-open .exam-reference-panel {
+    order: 2;
+  }
+
+  body.reference-open .exam-panel {
+    order: 3;
+  }
+
   #pdf-viewer {
     min-height: 70vh;
   }
