@@ -96,6 +96,8 @@ let pdfJsModule = null;
 let activePdfDocument = null;
 let activePdfPageNumber = 1;
 let activePdfRenderTask = null;
+let activePdfSearchResults = [];
+let activePdfSearchIndex = -1;
 
 function openSessionPdfDb() {
   return new Promise((resolve, reject) => {
@@ -438,6 +440,88 @@ async function renderActivePdfPage() {
   }
 }
 
+function normalizePdfSearchText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function updatePdfSearchStatus(message) {
+  const status = document.getElementById("pdf-search-status");
+  if (status) {
+    status.textContent = message;
+  }
+}
+
+async function extractPdfPageText(pageNumber) {
+  const page = await activePdfDocument.getPage(pageNumber);
+  const textContent = await page.getTextContent();
+  return textContent.items.map((item) => item.str || "").join(" ");
+}
+
+async function goToPdfSearchResult(index) {
+  if (!activePdfSearchResults.length) {
+    return;
+  }
+
+  activePdfSearchIndex = ((index % activePdfSearchResults.length) + activePdfSearchResults.length) % activePdfSearchResults.length;
+  const result = activePdfSearchResults[activePdfSearchIndex];
+  activePdfPageNumber = result.pageNumber;
+  await renderActivePdfPage();
+  updatePdfSearchStatus(`Match ${activePdfSearchIndex + 1} of ${activePdfSearchResults.length} on page ${result.pageNumber}.`);
+}
+
+async function searchActivePdf(query) {
+  const normalizedQuery = normalizePdfSearchText(query);
+  const searchButton = document.getElementById("pdf-search-button");
+  const nextButton = document.getElementById("pdf-search-next");
+
+  activePdfSearchResults = [];
+  activePdfSearchIndex = -1;
+
+  if (!activePdfDocument) {
+    updatePdfSearchStatus("Load a reference book before searching.");
+    return;
+  }
+
+  if (!normalizedQuery) {
+    updatePdfSearchStatus("Enter a keyword to find matching pages.");
+    return;
+  }
+
+  if (searchButton) {
+    searchButton.disabled = true;
+  }
+  if (nextButton) {
+    nextButton.disabled = true;
+  }
+
+  updatePdfSearchStatus(`Searching ${activePdfDocument.numPages} pages...`);
+
+  try {
+    for (let pageNumber = 1; pageNumber <= activePdfDocument.numPages; pageNumber += 1) {
+      const pageText = normalizePdfSearchText(await extractPdfPageText(pageNumber));
+      if (pageText.includes(normalizedQuery)) {
+        activePdfSearchResults.push({ pageNumber });
+      }
+    }
+
+    if (!activePdfSearchResults.length) {
+      updatePdfSearchStatus(`No pages found for "${query}".`);
+      return;
+    }
+
+    await goToPdfSearchResult(0);
+  } catch {
+    updatePdfSearchStatus("Search is unavailable for this PDF. Some scanned books do not contain selectable text.");
+  } finally {
+    if (searchButton) {
+      searchButton.disabled = false;
+    }
+    if (nextButton) {
+      nextButton.disabled = false;
+    }
+  }
+}
+
 async function loadPdfFileIntoCanvas(file) {
   const viewer = document.getElementById("pdf-viewer");
   const canvasViewer = document.getElementById("pdf-js-viewer");
@@ -447,6 +531,8 @@ async function loadPdfFileIntoCanvas(file) {
 
   activePdfDocument = await pdfjs.getDocument({ data: bytes }).promise;
   activePdfPageNumber = 1;
+  activePdfSearchResults = [];
+  activePdfSearchIndex = -1;
 
   if (viewer) {
     viewer.hidden = true;
@@ -1563,8 +1649,29 @@ function bindPdfPageButtons() {
   });
 }
 
+function bindPdfSearch() {
+  const searchForm = document.getElementById("pdf-search-form");
+  const searchInput = document.getElementById("pdf-search-input");
+  const nextButton = document.getElementById("pdf-search-next");
+
+  searchForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await searchActivePdf(searchInput?.value || "");
+  });
+
+  nextButton?.addEventListener("click", async () => {
+    if (!activePdfSearchResults.length) {
+      await searchActivePdf(searchInput?.value || "");
+      return;
+    }
+
+    await goToPdfSearchResult(activePdfSearchIndex + 1);
+  });
+}
+
 async function initViewerPage() {
   bindPdfPageButtons();
+  bindPdfSearch();
 
   const params = new URLSearchParams(window.location.search);
   const bookKey = params.get("book") || "";

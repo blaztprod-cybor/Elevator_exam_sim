@@ -8,7 +8,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/icon.svg" />
-    <link rel="stylesheet" href="./app.css?v=20260519-header" />
+    <link rel="stylesheet" href="./app.css?v=20260519-pdf-search" />
   </head>
   <body data-page="viewer">
     <main class="viewer-shell">
@@ -22,6 +22,15 @@
 
       <section class="card standalone-pdf-panel">
         <div id="pdf-js-viewer" class="pdf-js-viewer">
+          <form id="pdf-search-form" class="pdf-search-form">
+            <label for="pdf-search-input">Keyword search</label>
+            <div class="pdf-search-controls">
+              <input id="pdf-search-input" class="pdf-search-input" type="search" placeholder="Search this reference book" />
+              <button id="pdf-search-button" type="submit" class="btn btn-secondary">Search</button>
+              <button id="pdf-search-next" type="button" class="btn btn-secondary">Next</button>
+            </div>
+            <p id="pdf-search-status" class="pdf-search-status" aria-live="polite">Enter a keyword to find matching pages.</p>
+          </form>
           <div class="pdf-js-toolbar">
             <button type="button" id="pdf-prev-page" class="btn btn-secondary">Previous Page</button>
             <span id="pdf-page-status">Page 1 / 1</span>
@@ -33,7 +42,7 @@
       </section>
     </main>
     <script src="./config.js?v=20260515-render-deploy"></script>
-    <script src="./app.js?v=20260519-pwa"></script>
-    <script src="./pwa-register.js?v=20260519-pwa"></script>
+    <script src="./app.js?v=20260519-pdf-search"></script>
+    <script src="./pwa-register.js?v=20260519-install-links"></script>
   </body>
 </html>
