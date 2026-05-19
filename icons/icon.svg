@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Elevator exam app icon</title>
+  <rect width="512" height="512" rx="96" fill="#1d5fd1"/>
+  <rect x="116" y="72" width="280" height="368" rx="28" fill="#ffffff"/>
+  <rect x="148" y="112" width="216" height="42" rx="12" fill="#dbeafe"/>
+  <path d="M202 248h108l-38-38 26-26 82 82-82 82-26-26 38-38H202v-36Z" fill="#1d5fd1"/>
+  <path d="M188 184h-36v184h36V184Zm172 0h-36v184h36V184Z" fill="#10233f"/>
+</svg>

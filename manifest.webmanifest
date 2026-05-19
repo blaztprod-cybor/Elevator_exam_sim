@@ -1,0 +1,20 @@
+{
+  "name": "NYC DOB Elevator Inspector Exam Simulator",
+  "short_name": "Elevator Exam",
+  "description": "Practice the NYC DOB elevator inspector exam and open saved reference PDFs from the candidate device.",
+  "start_url": "./start.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#edf4ff",
+  "theme_color": "#1d5fd1",
+  "orientation": "any",
+  "categories": ["education", "productivity", "reference"],
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

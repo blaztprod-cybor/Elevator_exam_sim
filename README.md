@@ -15,6 +15,21 @@ Then open:
 http://127.0.0.1:4175/start.html
 ```
 
+## Progressive web app
+
+The simulator is installable as a PWA from `start.html` on HTTPS deployments and on localhost during development.
+
+- `manifest.webmanifest`, `icons/icon.svg`, `sw.js`, and `pwa-register.js` provide install metadata, app-shell caching, and the install prompt.
+- The service worker caches the simulator pages, CSS, JavaScript, PDF.js assets, and local question-bank CSV so candidates can keep practicing after the first successful load.
+- Reference PDFs selected with **Link to my copy** remain stored in browser IndexedDB on the candidate device and open in `viewer.html`. The service worker does not pre-cache every bundled reference PDF because those files are large and candidates may need to use their own licensed copies.
+
+After deploying, verify PWA support in Chrome DevTools:
+
+1. Open the deployed HTTPS URL.
+2. Confirm the install prompt appears or the browser shows an install option.
+3. Start the sample exam once, select at least one local reference PDF, then reload with DevTools network set to offline.
+4. Confirm `start.html`, the exam pages, the question bank fallback, and the selected reference PDF still open.
+
 ## Railway deploy
 
 Create a Railway project from this GitHub repo.
@@ -81,6 +96,7 @@ When a paid checkout completes, the script verifies the Checkout Session with St
 
 - `start.html`, `exam.html`, `results.html`, `review.html`, and `viewer.html` are the simulator pages.
 - `app.js`, `app.css`, and `config.js` contain the app behavior, styling, and question-bank configuration.
+- `manifest.webmanifest`, `sw.js`, `pwa-register.js`, and `icons/` make the simulator installable as a progressive web app.
 - `question-bank-1000.csv` is the bundled local question bank.
 - `reference-pdfs/` contains local reference PDFs used by the app.
 - `server.mjs` serves the app, handles access-code requests, and opens linked reference PDFs only on localhost.

@@ -3,8 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1d5fd1" />
     <title>NYC DOB Elevator Inspector Start</title>
-    <link rel="stylesheet" href="./app.css?v=20260502-sheet-pool" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon.svg" />
+    <link rel="stylesheet" href="./app.css?v=20260519-install-links" />
   </head>
   <body data-page="start">
     <main class="hero">
@@ -14,8 +18,42 @@
         <h1>NYC DOB Elevator Inspector</h1>
         <p class="hero-copy">
           Practice from the live question bank. The sample exam is 5 questions with an 18 minute timer.
-          The full simulator is 50 questions with a 3 hour timer.
+          The full simulator is 50 questions with a 3 hour timer. Download the browser app to enable
+          access to reference books on your device.
         </p>
+        <section class="install-panel" aria-labelledby="install-app-title">
+          <div class="install-panel-heading">
+            <p class="eyebrow">Install App</p>
+            <h2 id="install-app-title">Download to your device</h2>
+          </div>
+          <div class="install-grid">
+            <article class="install-card">
+              <strong>Mac</strong>
+              <span>Chrome, Edge, or Safari</span>
+              <button class="btn btn-secondary pwa-install-trigger" type="button">Install for Mac</button>
+            </article>
+            <article class="install-card">
+              <strong>Windows PC</strong>
+              <span>Chrome or Edge</span>
+              <button class="btn btn-secondary pwa-install-trigger" type="button">Install for PC</button>
+            </article>
+            <article class="install-card">
+              <strong>iPhone / iPad</strong>
+              <span>Safari share menu</span>
+              <a class="btn btn-secondary" href="#ios-install-help">iOS Steps</a>
+            </article>
+            <article class="install-card">
+              <strong>Android</strong>
+              <span>Chrome install prompt</span>
+              <button class="btn btn-secondary pwa-install-trigger" type="button">Install for Android</button>
+            </article>
+          </div>
+          <p id="install-app-status" class="form-status install-status" aria-live="polite"></p>
+          <details id="ios-install-help" class="ios-install-help">
+            <summary>iOS install steps</summary>
+            <p>Open this site in Safari, tap Share, then tap Add to Home Screen.</p>
+          </details>
+        </section>
         <form id="sample-account-form" class="sample-account-form">
           <label for="sample-email">Email address</label>
           <div class="email-entry">
@@ -69,7 +107,8 @@
         </section>
       </section>
     </main>
-    <script src="./config.js?v=20260502-sheet-pool"></script>
-    <script src="./app.js?v=20260502-sheet-pool"></script>
+    <script src="./config.js?v=20260515-render-deploy"></script>
+    <script src="./app.js?v=20260519-pwa"></script>
+    <script src="./pwa-register.js?v=20260519-install-links"></script>
   </body>
   </html>

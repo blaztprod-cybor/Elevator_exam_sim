@@ -298,6 +298,11 @@ async function validateFullAccessSession() {
     renderAccessExpiration(nextSession.access);
     return nextSession;
   } catch {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      renderAccessExpiration(session.access);
+      return session;
+    }
+
     localStorage.removeItem(FULL_ACCESS_KEY);
     renderAccessExpiration(null);
     return null;
@@ -1773,6 +1778,22 @@ async function initStartPage() {
       verifyCodeButton.disabled = true;
     }
     try {
+      const existingSession = loadFullAccessSession();
+      const normalizedEmail = normalizeSampleEmail(email);
+      if (existingSession?.accessToken && existingSession.email === normalizedEmail && !String(code || "").trim()) {
+        const validSession = await validateFullAccessSession();
+        if (!validSession) {
+          throw new Error("Your saved full exam access could not be verified. Request a new code.");
+        }
+
+        if (accessStatus) {
+          accessStatus.dataset.tone = "success";
+          accessStatus.textContent = "Access verified. Loading full exam...";
+        }
+        await startNewExam({ mode: "full", accountEmail: validSession.email, accessToken: validSession.accessToken });
+        return;
+      }
+
       const verified = await postAccessGate("/api/access/verify-code", { email, phone, code });
       const session = saveFullAccessSession({
         email: verified.email || email,
