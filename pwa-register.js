@@ -4,48 +4,35 @@
   }
 
   let deferredInstallPrompt = null;
-  let installButton = null;
-  let statusNode = null;
 
   function isStandaloneApp() {
     return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
   }
 
   function installTargets() {
-    return Array.from(document.querySelectorAll(".pwa-install-trigger, .pwa-install-button")).filter(Boolean);
+    return Array.from(document.querySelectorAll(".pwa-install-trigger, .pwa-install-button, .pwa-install-status-link")).filter(Boolean);
   }
 
   function setInstallButtonState(installed) {
     installTargets().forEach((button) => {
-      if (!button.classList.contains("pwa-install-button")) {
+      if (button.classList.contains("pwa-install-status-link")) {
         button.textContent = installed ? "App Installed" : "App Download Link";
+        return;
+      }
+
+      if (!button.classList.contains("pwa-install-button")) {
+        button.textContent = installed ? "App Installed" : button.dataset.installLabel || button.textContent;
       }
       button.disabled = installed;
     });
   }
 
   function ensureBanner() {
-    if (document.querySelector(".pwa-banner")) {
-      return;
-    }
-
-    const banner = document.createElement("div");
-    banner.className = "pwa-banner";
-    banner.innerHTML = `
-      <span class="pwa-status" aria-live="polite"></span>
-      <button class="btn btn-secondary pwa-install-button" type="button" hidden>Install</button>
-    `;
-    document.body.appendChild(banner);
-    installButton = banner.querySelector(".pwa-install-button");
-    statusNode = banner.querySelector(".pwa-status");
-
     bindInstallButtons();
   }
 
   function setStatus(message) {
     ensureBanner();
-    statusNode.textContent = message;
-
     const pageStatus = document.getElementById("install-app-status");
     if (pageStatus) {
       pageStatus.textContent = message;
@@ -69,9 +56,6 @@
     deferredInstallPrompt = null;
     const installed = choice?.outcome === "accepted";
     setInstallButtonState(installed);
-    if (installed && installButton) {
-      installButton.hidden = true;
-    }
   }
 
   function bindInstallButtons() {
@@ -81,6 +65,11 @@
       }
 
       button.dataset.installBound = "true";
+      button.dataset.installLabel = button.textContent;
+      if (button.classList.contains("pwa-install-status-link")) {
+        return;
+      }
+
       button.addEventListener("click", requestInstall);
     });
   }
@@ -116,9 +105,6 @@
     deferredInstallPrompt = null;
     setInstallButtonState(true);
     setStatus("App installed.");
-    if (installButton) {
-      installButton.hidden = true;
-    }
   });
 
   window.addEventListener("online", updateOnlineStatus);

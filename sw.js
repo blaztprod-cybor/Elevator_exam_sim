@@ -1,4 +1,4 @@
-const CACHE_VERSION = "elevator-exam-pwa-v6";
+const CACHE_VERSION = "elevator-exam-pwa-v8";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -6,14 +6,15 @@ const APP_SHELL_URLS = [
   "./",
   "./index.html",
   "./start.html",
+  "./install.html",
   "./exam.html",
   "./review.html",
   "./results.html",
   "./viewer.html",
-  "./app.css?v=20260519-compact-install",
+  "./app.css?v=20260519-install-page",
   "./config.js?v=20260515-render-deploy",
   "./app.js?v=20260519-pdf-search",
-  "./pwa-register.js?v=20260519-compact-install",
+  "./pwa-register.js?v=20260519-install-page2",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./vendor/pdf.min.mjs",
