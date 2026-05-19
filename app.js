@@ -451,6 +451,37 @@ function updatePdfSearchStatus(message) {
   }
 }
 
+function updatePdfSearchCount() {
+  const count = document.getElementById("pdf-search-count");
+  if (!count) {
+    return;
+  }
+
+  const total = activePdfSearchResults.length;
+  count.textContent = total ? `${activePdfSearchIndex + 1} / ${total}` : "0 / 0";
+}
+
+function countPdfSearchOccurrences(text, query) {
+  if (!query) {
+    return 0;
+  }
+
+  let count = 0;
+  let index = 0;
+
+  while (index < text.length) {
+    const foundIndex = text.indexOf(query, index);
+    if (foundIndex === -1) {
+      break;
+    }
+
+    count += 1;
+    index = foundIndex + query.length;
+  }
+
+  return count;
+}
+
 async function extractPdfPageText(pageNumber) {
   const page = await activePdfDocument.getPage(pageNumber);
   const textContent = await page.getTextContent();
@@ -466,16 +497,19 @@ async function goToPdfSearchResult(index) {
   const result = activePdfSearchResults[activePdfSearchIndex];
   activePdfPageNumber = result.pageNumber;
   await renderActivePdfPage();
+  updatePdfSearchCount();
   updatePdfSearchStatus(`Match ${activePdfSearchIndex + 1} of ${activePdfSearchResults.length} on page ${result.pageNumber}.`);
 }
 
 async function searchActivePdf(query) {
   const normalizedQuery = normalizePdfSearchText(query);
   const searchButton = document.getElementById("pdf-search-button");
+  const previousButton = document.getElementById("pdf-search-prev");
   const nextButton = document.getElementById("pdf-search-next");
 
   activePdfSearchResults = [];
   activePdfSearchIndex = -1;
+  updatePdfSearchCount();
 
   if (!activePdfDocument) {
     updatePdfSearchStatus("Load a reference book before searching.");
@@ -490,6 +524,9 @@ async function searchActivePdf(query) {
   if (searchButton) {
     searchButton.disabled = true;
   }
+  if (previousButton) {
+    previousButton.disabled = true;
+  }
   if (nextButton) {
     nextButton.disabled = true;
   }
@@ -499,13 +536,15 @@ async function searchActivePdf(query) {
   try {
     for (let pageNumber = 1; pageNumber <= activePdfDocument.numPages; pageNumber += 1) {
       const pageText = normalizePdfSearchText(await extractPdfPageText(pageNumber));
-      if (pageText.includes(normalizedQuery)) {
-        activePdfSearchResults.push({ pageNumber });
+      const occurrenceCount = countPdfSearchOccurrences(pageText, normalizedQuery);
+      for (let occurrenceIndex = 0; occurrenceIndex < occurrenceCount; occurrenceIndex += 1) {
+        activePdfSearchResults.push({ pageNumber, occurrenceIndex });
       }
     }
 
     if (!activePdfSearchResults.length) {
       updatePdfSearchStatus(`No pages found for "${query}".`);
+      updatePdfSearchCount();
       return;
     }
 
@@ -515,6 +554,9 @@ async function searchActivePdf(query) {
   } finally {
     if (searchButton) {
       searchButton.disabled = false;
+    }
+    if (previousButton) {
+      previousButton.disabled = false;
     }
     if (nextButton) {
       nextButton.disabled = false;
@@ -533,6 +575,7 @@ async function loadPdfFileIntoCanvas(file) {
   activePdfPageNumber = 1;
   activePdfSearchResults = [];
   activePdfSearchIndex = -1;
+  updatePdfSearchCount();
 
   if (viewer) {
     viewer.hidden = true;
@@ -1705,11 +1748,21 @@ function bindPdfPageButtons() {
 function bindPdfSearch() {
   const searchForm = document.getElementById("pdf-search-form");
   const searchInput = document.getElementById("pdf-search-input");
+  const previousButton = document.getElementById("pdf-search-prev");
   const nextButton = document.getElementById("pdf-search-next");
 
   searchForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     await searchActivePdf(searchInput?.value || "");
+  });
+
+  previousButton?.addEventListener("click", async () => {
+    if (!activePdfSearchResults.length) {
+      await searchActivePdf(searchInput?.value || "");
+      return;
+    }
+
+    await goToPdfSearchResult(activePdfSearchIndex - 1);
   });
 
   nextButton?.addEventListener("click", async () => {
