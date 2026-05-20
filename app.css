@@ -577,6 +577,13 @@ body.reference-open .exam-layout {
   align-items: start;
 }
 
+.pdf-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .pdf-panel h2 {
   margin: 0;
   font-size: 1.25rem;
@@ -603,10 +610,6 @@ body.reference-open .exam-layout {
 
 .pdf-open-link {
   width: fit-content;
-  color: var(--primary);
-  font-size: 0.92rem;
-  font-weight: 800;
-  text-decoration: underline;
 }
 
 .pdf-open-link[hidden] {
