@@ -498,9 +498,11 @@ function renderPdfHighlightsForPage(pageNumber, viewport, highlightLayer) {
   }
 
   pageResults.forEach((result, pageResultIndex) => {
-    const [x, y, width, height] = viewport.convertToViewportRectangle(result.rect);
-    const left = Math.min(x, width);
-    const top = Math.min(y, height);
+    const transform = pdfJsModule.Util.transform(viewport.transform, result.transform);
+    const height = Math.max(8, Math.hypot(transform[2], transform[3]) || result.height * viewport.scale);
+    const width = Math.max(8, result.width * viewport.scale);
+    const left = transform[4];
+    const top = transform[5] - height;
     const highlight = document.createElement("span");
 
     highlight.className = "pdf-search-highlight";
@@ -510,8 +512,8 @@ function renderPdfHighlightsForPage(pageNumber, viewport, highlightLayer) {
     highlight.dataset.searchIndex = String(activePdfSearchResults.indexOf(result));
     highlight.style.left = `${left}px`;
     highlight.style.top = `${top}px`;
-    highlight.style.width = `${Math.abs(width - x)}px`;
-    highlight.style.height = `${Math.abs(height - y)}px`;
+    highlight.style.width = `${width}px`;
+    highlight.style.height = `${height}px`;
     highlight.title = `Match ${pageResultIndex + 1} on page ${pageNumber}`;
     highlightLayer.appendChild(highlight);
   });
@@ -519,7 +521,26 @@ function renderPdfHighlightsForPage(pageNumber, viewport, highlightLayer) {
 
 function scrollToActivePdfPage() {
   const pageShell = document.querySelector(`.pdf-page-shell[data-page-number="${activePdfPageNumber}"]`);
-  pageShell?.scrollIntoView({ block: "start", inline: "nearest" });
+  scrollPdfViewerToElement(pageShell, "start");
+}
+
+function scrollPdfViewerToElement(element, block = "center") {
+  const viewer = document.getElementById("pdf-js-viewer");
+  const pagesContainer = document.getElementById("pdf-pages");
+  if (!viewer || !pagesContainer || !element) {
+    return;
+  }
+
+  const viewerRect = viewer.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  const nextTop =
+    block === "start"
+      ? viewer.scrollTop + elementRect.top - viewerRect.top - 112
+      : viewer.scrollTop + elementRect.top - viewerRect.top - viewer.clientHeight / 2 + elementRect.height / 2;
+  const nextLeft = viewer.scrollLeft + elementRect.left - viewerRect.left - viewer.clientWidth / 2 + elementRect.width / 2;
+
+  viewer.scrollTop = Math.max(0, nextTop);
+  viewer.scrollLeft = Math.max(0, nextLeft);
 }
 
 function normalizePdfSearchText(value) {
@@ -584,8 +605,6 @@ async function extractPdfPageSearchResults(pageNumber, query) {
     }
 
     const transform = item.transform || [1, 0, 0, 1, 0, 0];
-    const x = Number(transform[4] || 0);
-    const y = Number(transform[5] || 0);
     const width = Math.max(8, Number(item.width || 0));
     const height = Math.max(8, Number(item.height || Math.abs(transform[3]) || 10));
     const occurrenceCount = countPdfSearchOccurrences(normalizedText, normalizedQuery);
@@ -594,7 +613,9 @@ async function extractPdfPageSearchResults(pageNumber, query) {
       results.push({
         pageNumber,
         occurrenceIndex,
-        rect: [x, y, x + width, y + height],
+        transform,
+        width,
+        height,
       });
     }
   });
@@ -618,7 +639,7 @@ async function goToPdfSearchResult(index) {
 
 function scrollToActivePdfSearchResult() {
   const activeHighlight = document.querySelector(`.pdf-search-highlight[data-search-index="${activePdfSearchIndex}"]`);
-  activeHighlight?.scrollIntoView({ block: "center", inline: "center" });
+  scrollPdfViewerToElement(activeHighlight, "center");
 }
 
 async function searchActivePdf(query) {
@@ -1879,6 +1900,30 @@ function bindPdfZoomButtons() {
   });
 }
 
+function bindPdfViewerScrollLock() {
+  const viewer = document.getElementById("pdf-js-viewer");
+  if (!viewer || viewer.dataset.scrollLockBound === "true") {
+    return;
+  }
+
+  viewer.dataset.scrollLockBound = "true";
+  viewer.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+
+      if (event.shiftKey && Math.abs(event.deltaX) < Math.abs(event.deltaY)) {
+        viewer.scrollLeft += event.deltaY;
+        return;
+      }
+
+      viewer.scrollLeft += event.deltaX;
+      viewer.scrollTop += event.deltaY;
+    },
+    { passive: false }
+  );
+}
+
 function bindPdfSearch() {
   const searchForm = document.getElementById("pdf-search-form");
   const searchInput = document.getElementById("pdf-search-input");
@@ -1912,6 +1957,7 @@ function bindPdfSearch() {
 async function initViewerPage() {
   bindPdfPageButtons();
   bindPdfZoomButtons();
+  bindPdfViewerScrollLock();
   bindPdfSearch();
 
   const params = new URLSearchParams(window.location.search);
@@ -2195,6 +2241,7 @@ async function initExamPage() {
   bindReferenceButtons();
   bindPdfPageButtons();
   bindPdfZoomButtons();
+  bindPdfViewerScrollLock();
   bindPdfSearch();
   bindInlineReferencePanel();
   await updateReferenceStatuses();
