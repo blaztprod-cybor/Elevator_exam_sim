@@ -17,6 +17,7 @@ const DEFAULT_EXAM_QUESTION_COUNT = 50;
 const DEFAULT_EXAM_DURATION_SECONDS = 10800;
 const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
 const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
+const REFERENCE_PDF_WINDOW_NAME = "elevator-reference-pdf";
 
 const books = [
   { title: "ASME A17.1-2004", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
@@ -770,6 +771,18 @@ async function preparePdfFromFile(file, { persist = false } = {}) {
   }
 
   await loadPdfFileIntoCanvas(file);
+}
+
+async function openStoredPdfInNativeViewer(book) {
+  const record = await loadSessionPdf(book.key);
+  if (!record?.file) {
+    window.alert("This PDF was not selected on the opening screen.");
+    return false;
+  }
+
+  const nativePdfUrl = URL.createObjectURL(record.file);
+  window.open(nativePdfUrl, REFERENCE_PDF_WINDOW_NAME, "noopener");
+  return true;
 }
 
 async function fetchLinkedBooks() {
@@ -1773,14 +1786,13 @@ async function openReferenceBook(book) {
     return;
   }
 
-  const inlinePanel = document.getElementById("exam-reference-panel");
-  if (inlinePanel && !book.online) {
-    await openInlineReferenceBook(book);
+  if (book.online) {
+    window.open(book.path, REFERENCE_PDF_WINDOW_NAME, "noopener");
     return;
   }
 
-  if (book.online) {
-    window.open(book.path, "_blank", "noopener");
+  if (!isLocalDesktopServer()) {
+    await openStoredPdfInNativeViewer(book);
     return;
   }
 
@@ -1809,7 +1821,7 @@ async function openReferenceBook(book) {
     }
   }
 
-  window.open(`./viewer.html?book=${encodeURIComponent(book.key)}`, "_blank", "noopener");
+  window.open(`./viewer.html?book=${encodeURIComponent(book.key)}`, REFERENCE_PDF_WINDOW_NAME, "noopener");
 }
 
 async function openInlineReferenceBook(book) {
