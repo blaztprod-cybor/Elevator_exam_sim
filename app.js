@@ -19,6 +19,28 @@ const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
 const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
 const REFERENCE_PDF_WINDOW_NAME = "elevator-reference-pdf";
 
+function openReferencePdfWindow(url) {
+  const availableWidth = window.screen?.availWidth || 1440;
+  const availableHeight = window.screen?.availHeight || 900;
+  const width = Math.max(760, Math.round(availableWidth * 0.55));
+  const height = Math.max(700, availableHeight);
+  const left = Math.max(0, (window.screen?.availLeft || 0) + availableWidth - width);
+  const top = Math.max(0, window.screen?.availTop || 0);
+  const features = [
+    "popup=yes",
+    "resizable=yes",
+    "scrollbars=yes",
+    `width=${width}`,
+    `height=${height}`,
+    `left=${left}`,
+    `top=${top}`,
+  ].join(",");
+  const referenceWindow = window.open(url, REFERENCE_PDF_WINDOW_NAME, features);
+
+  referenceWindow?.focus();
+  return referenceWindow;
+}
+
 const books = [
   { title: "ASME A17.1-2004", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
   { title: "ASME A17.2-2010", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
@@ -781,7 +803,7 @@ async function openStoredPdfInNativeViewer(book) {
   }
 
   const nativePdfUrl = URL.createObjectURL(record.file);
-  window.open(nativePdfUrl, REFERENCE_PDF_WINDOW_NAME, "noopener");
+  openReferencePdfWindow(nativePdfUrl);
   return true;
 }
 
@@ -1787,7 +1809,7 @@ async function openReferenceBook(book) {
   }
 
   if (book.online) {
-    window.open(book.path, REFERENCE_PDF_WINDOW_NAME, "noopener");
+    openReferencePdfWindow(book.path);
     return;
   }
 
@@ -1821,7 +1843,7 @@ async function openReferenceBook(book) {
     }
   }
 
-  window.open(`./viewer.html?book=${encodeURIComponent(book.key)}`, REFERENCE_PDF_WINDOW_NAME, "noopener");
+  openReferencePdfWindow(`./viewer.html?book=${encodeURIComponent(book.key)}`);
 }
 
 async function openInlineReferenceBook(book) {
