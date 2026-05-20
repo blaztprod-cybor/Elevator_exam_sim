@@ -564,6 +564,10 @@ function updatePdfSearchCount() {
   count.textContent = total ? `${activePdfSearchIndex + 1} / ${total}` : "0 / 0";
 }
 
+function countPdfSearchPages() {
+  return new Set(activePdfSearchResults.map((result) => result.pageNumber)).size;
+}
+
 function countPdfSearchOccurrences(text, query) {
   if (!query) {
     return 0;
@@ -634,7 +638,7 @@ async function goToPdfSearchResult(index) {
   await renderActivePdfPage({ scrollToPage: true });
   scrollToActivePdfSearchResult();
   updatePdfSearchCount();
-  updatePdfSearchStatus(`Match ${activePdfSearchIndex + 1} of ${activePdfSearchResults.length} on page ${result.pageNumber}.`);
+  updatePdfSearchStatus(`Found on ${countPdfSearchPages()} page${countPdfSearchPages() === 1 ? "" : "s"}. Match ${activePdfSearchIndex + 1} of ${activePdfSearchResults.length}.`);
 }
 
 function scrollToActivePdfSearchResult() {
