@@ -26,14 +26,9 @@
           <label for="sample-email">Email address</label>
           <div class="email-entry">
             <input id="sample-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
-            <button id="request-sample-code" class="btn btn-secondary" type="button">Email Code</button>
-          </div>
-          <label for="sample-code">6-digit email code</label>
-          <div class="email-entry">
-            <input id="sample-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
             <button id="start-sample-exam" class="btn btn-primary" type="submit">Start Sample Exam</button>
           </div>
-          <p class="form-helper">Enter an email address, then use the code sent to that inbox. Unsubscribed emails are limited to 4 sample exams.</p>
+          <p class="form-helper">Enter an email address to start the sample exam. Unsubscribed emails are limited to 4 sample exams.</p>
           <p id="sample-account-status" class="form-status" aria-live="polite"></p>
         </form>
         <form id="full-access-form" class="sample-account-form access-gate-form">
@@ -81,7 +76,7 @@
       </section>
     </main>
     <script src="./config.js?v=20260515-render-deploy"></script>
-    <script src="./app.js?v=20260530-email-trial-code"></script>
+    <script src="./app.js?v=20260530-simple-trial"></script>
     <script src="./pwa-register.js?v=20260519-install-page2"></script>
   </body>
   </html>
