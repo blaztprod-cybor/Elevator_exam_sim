@@ -58,7 +58,7 @@ After deployment, test the temporary `*.up.railway.app` URL:
 
 - `start.html` loads.
 - The sample exam starts.
-- Starting a sample exam records the email in the access-list Google Sheet.
+- Starting a sample exam requires a 6-digit email code and records the verified email in the access-list Google Sheet.
 - A full access code request reaches the backend.
 - Reference books show `Choose PDF` and open from browser storage instead of Mac Preview.
 
@@ -66,7 +66,7 @@ Then add `elevatorexamsim.com` and `www.elevatorexamsim.com` as custom domains i
 
 ## Sample email capture
 
-Use [google-apps-script/stripe-access-webhook.gs](./google-apps-script/stripe-access-webhook.gs) to append sample exam email starts to the same Google Sheet used by `ACCESS_SHEET_URL`. The same Apps Script web app can handle both Stripe purchases and sample exam starts.
+Use [google-apps-script/stripe-access-webhook.gs](./google-apps-script/stripe-access-webhook.gs) to email trial verification codes and append verified sample exam email starts to the same Google Sheet used by `ACCESS_SHEET_URL`. The same Apps Script web app can handle both Stripe purchases and sample exam starts.
 
 Setup:
 
@@ -92,9 +92,9 @@ SAMPLE_SIGNUP_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
 SAMPLE_SIGNUP_SHARED_SECRET=the same long random password
 ```
 
-When a user starts a sample exam, the backend posts the email to Apps Script, which appends a row with `access status` set to `TRIAL`. `TRIAL` rows do not grant full exam access.
+When a user requests a sample exam, the backend emails a 6-digit code through Apps Script. After the user verifies that code, the backend posts the verified email to Apps Script, which appends or updates a row with `access status` set to `TRIAL`. `TRIAL` rows do not grant full exam access. Unsubscribed trial users are limited to 4 sample exams per browser/device.
 
-To reset a user's local 3-sample limit, add or update that email in the access sheet with:
+To reset a user's local 4-sample limit, add or update that email in the access sheet with:
 
 ```text
 access status=TRIAL_RESET

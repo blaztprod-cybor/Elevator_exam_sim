@@ -32,6 +32,10 @@ function doPost(event) {
     assertSharedSecret_(event);
 
     const payload = JSON.parse(event.postData.contents || "{}");
+    if (payload.source === "sample_code_request") {
+      return sendSampleCode_(payload);
+    }
+
     if (payload.source === "sample_exam_start") {
       return appendSampleSignup_(payload);
     }
@@ -292,6 +296,32 @@ function appendSampleSignup_(payload) {
   }
 
   return json_({ received: true, recorded: true, email, updatedExistingRow: Boolean(existingEmailRow) });
+}
+
+function sendSampleCode_(payload) {
+  const email = normalizeEmail_(payload.email);
+  const code = String(payload.code || "").replace(/\D/g, "");
+  if (!isValidEmail_(email)) {
+    throw new Error("A valid email is required.");
+  }
+  if (!/^\d{6}$/.test(code)) {
+    throw new Error("A valid 6-digit code is required.");
+  }
+
+  MailApp.sendEmail({
+    to: email,
+    subject: "Elevator Exam SIM trial code",
+    body: [
+      "Your Elevator Exam SIM trial code is " + code + ".",
+      "",
+      "This code expires in 10 minutes.",
+      "",
+      "If you did not request this code, you can ignore this email.",
+    ].join("\n"),
+    name: "Elevator Exam SIM",
+  });
+
+  return json_({ received: true, sent: true, email });
 }
 
 function normalizeEmail_(value) {

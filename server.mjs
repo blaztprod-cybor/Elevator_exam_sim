@@ -59,6 +59,7 @@ const ADMIN_ACCESS_EMAILS = new Set(
 const ACCESS_CODE_TTL_MS = 10 * 60 * 1000;
 const VERIFIED_ACCESS_TTL_MS = 12 * 60 * 60 * 1000;
 const accessCodes = new Map();
+const sampleEmailCodes = new Map();
 const verifiedAccessTokens = new Map();
 let lastSampleSignupStatus = {
   at: null,
@@ -161,6 +162,44 @@ async function recordSampleSignup({ email, userAgent, ipAddress }) {
   }
 
   return { recorded: true, response: data };
+}
+
+async function sendSampleEmailCode({ email, code }) {
+  if (!SAMPLE_SIGNUP_WEBHOOK_URL) {
+    throw new Error("Sample email webhook is not configured.");
+  }
+
+  const url = new URL(SAMPLE_SIGNUP_WEBHOOK_URL);
+  if (SAMPLE_SIGNUP_SHARED_SECRET && !url.searchParams.has("secret")) {
+    url.searchParams.set("secret", SAMPLE_SIGNUP_SHARED_SECRET);
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      code,
+      source: "sample_code_request",
+      createdAt: new Date().toISOString(),
+    }),
+  });
+
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok || data?.received === false) {
+    throw new Error(data?.error || `Sample email code webhook failed with ${response.status}`);
+  }
+
+  return data;
 }
 
 function getSampleSignupDiagnostics() {
@@ -414,6 +453,12 @@ function pruneAccessMaps() {
     }
   }
 
+  for (const [key, record] of sampleEmailCodes.entries()) {
+    if (record.expiresAt <= now || record.attemptCount >= 5) {
+      sampleEmailCodes.delete(key);
+    }
+  }
+
   for (const [token, record] of verifiedAccessTokens.entries()) {
     if (record.expiresAt <= now) {
       verifiedAccessTokens.delete(token);
@@ -563,6 +608,87 @@ app.post("/api/sample/status", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Unable to check sample status." });
+  }
+});
+
+app.post("/api/sample/request-code", async (req, res) => {
+  try {
+    pruneAccessMaps();
+    const email = normalizeEmail(req.body?.email);
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: "Enter a valid email address." });
+      return;
+    }
+
+    const code = createAccessCode();
+    sampleEmailCodes.set(email, {
+      codeHash: hashAccessCode({ email, phone: "", code }),
+      expiresAt: Date.now() + ACCESS_CODE_TTL_MS,
+      attemptCount: 0,
+    });
+
+    await sendSampleEmailCode({ email, code });
+    res.json({ success: true, expiresInSeconds: Math.floor(ACCESS_CODE_TTL_MS / 1000) });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to send trial email code." });
+  }
+});
+
+app.post("/api/sample/verify-code", async (req, res) => {
+  try {
+    pruneAccessMaps();
+    const email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || "").replace(/\D/g, "");
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: "Enter a valid email address." });
+      return;
+    }
+
+    const pending = sampleEmailCodes.get(email);
+    if (!pending) {
+      res.status(403).json({ error: "Request a new email code before starting the sample exam." });
+      return;
+    }
+
+    if (pending.expiresAt <= Date.now()) {
+      sampleEmailCodes.delete(email);
+      res.status(403).json({ error: "The email code expired. Request a new code." });
+      return;
+    }
+
+    pending.attemptCount += 1;
+    if (pending.codeHash !== hashAccessCode({ email, phone: "", code })) {
+      res.status(403).json({ error: "That email code is not correct." });
+      return;
+    }
+
+    const result = await recordSampleSignup({
+      email,
+      userAgent: String(req.headers["user-agent"] || ""),
+      ipAddress: getClientIp(req),
+    });
+
+    lastSampleSignupStatus = {
+      at: new Date().toISOString(),
+      recorded: result.recorded,
+      reason: result.recorded ? "recorded" : result.reason || "not_recorded",
+    };
+    if (!result.recorded) {
+      res.status(503).json({ error: "Unable to record trial email. Please try again in a moment.", recorded: false });
+      return;
+    }
+
+    sampleEmailCodes.delete(email);
+    res.json({ success: true, recorded: true, email });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    lastSampleSignupStatus = {
+      at: new Date().toISOString(),
+      recorded: false,
+      reason: message,
+    };
+    console.warn("Unable to verify sample email code:", message);
+    res.status(502).json({ error: "Unable to verify trial email. Please try again in a moment.", recorded: false });
   }
 });
 

@@ -5,7 +5,7 @@ const FULL_ACCESS_KEY = "elevator_exam_full_access_v1";
 const SAMPLE_ACCESS_COUNTS_KEY = "elevator_exam_sample_access_counts_v1";
 const SAMPLE_QUESTION_HISTORY_KEY = "elevator_exam_sample_question_history_v1";
 const FULL_QUESTION_HISTORY_KEY = "elevator_exam_full_question_history_v1";
-const SAMPLE_ACCESS_LIMIT = 3;
+const SAMPLE_ACCESS_LIMIT = 4;
 const SAMPLE_ACCESS_UNLIMITED_EMAIL = "shawn.raynor@gmail.com";
 const SAMPLE_QUESTION_HISTORY_LIMIT = 5000;
 const FULL_QUESTION_HISTORY_LIMIT = 20000;
@@ -331,6 +331,43 @@ async function recordSampleExamStart(email) {
 
   if (!response.ok) {
     throw new Error(data.error || "Unable to record sample exam start.");
+  }
+  if (!data.recorded) {
+    throw new Error("Unable to record trial email. Please try again in a moment.");
+  }
+
+  return data;
+}
+
+async function requestSampleEmailCode(email) {
+  const response = await fetch("/api/sample/request-code", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email: normalizeSampleEmail(email) }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to send trial email code.");
+  }
+
+  return data;
+}
+
+async function verifySampleEmailCode(email, code) {
+  const response = await fetch("/api/sample/verify-code", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email: normalizeSampleEmail(email), code }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to verify trial email code.");
   }
   if (!data.recorded) {
     throw new Error("Unable to record trial email. Please try again in a moment.");
@@ -1483,7 +1520,7 @@ async function startNewExam({ mode = "full", accountEmail = null, accessToken = 
   if (isSample) {
     const sampleAccess = getSampleAccessStatus(accountEmail);
     if (!sampleAccess.allowed) {
-      throw new Error("This email has reached the 3 sample exam limit. Use full exam access to continue.");
+      throw new Error("This email has reached the 4 sample exam limit. Use full exam access to continue.");
     }
   }
   const questionCount = isSample ? config.sampleQuestionCount : config.fullQuestionCount;
@@ -2145,12 +2182,15 @@ async function initStartPage() {
   bindPreExamPdfUpload();
   const account = loadSampleAccount();
   const emailInput = document.getElementById("sample-email");
+  const sampleCodeInput = document.getElementById("sample-code");
   const status = document.getElementById("sample-account-status");
   const accessForm = document.getElementById("full-access-form");
   const accessEmailInput = document.getElementById("access-email");
   const accessPhoneInput = document.getElementById("access-phone");
   const accessCodeInput = document.getElementById("access-code");
   const accessStatus = document.getElementById("access-gate-status");
+  const requestSampleCodeButton = document.getElementById("request-sample-code");
+  const startSampleExamButton = document.getElementById("start-sample-exam");
   const requestCodeButton = document.getElementById("request-access-code");
   const verifyCodeButton = document.getElementById("verify-access-code");
   const fullAccessSession = loadFullAccessSession();
@@ -2178,15 +2218,65 @@ async function initStartPage() {
     validateFullAccessSession().catch(() => {});
   }
 
+  requestSampleCodeButton?.addEventListener("click", async () => {
+    const email = emailInput?.value || "";
+
+    if (status) {
+      status.dataset.tone = "";
+      status.textContent = "Checking trial access...";
+    }
+
+    if (!isValidEmail(email)) {
+      if (status) {
+        status.textContent = "Enter a valid email address to receive a trial code.";
+      }
+      emailInput?.focus();
+      return;
+    }
+
+    requestSampleCodeButton.disabled = true;
+    try {
+      await syncSampleAccountStatus(email);
+      const sampleAccess = getSampleAccessStatus(email);
+      if (!sampleAccess.allowed) {
+        throw new Error("This email has reached the 4 sample exam limit. Use full exam access to continue.");
+      }
+
+      await requestSampleEmailCode(email);
+      saveSampleAccount(email);
+      if (status) {
+        status.dataset.tone = "success";
+        status.textContent = "Trial code sent. Check that email inbox and enter the 6-digit code.";
+      }
+      sampleCodeInput?.focus();
+    } catch (error) {
+      if (status) {
+        status.dataset.tone = "";
+        status.textContent = error instanceof Error ? error.message : "Unable to send trial code.";
+      }
+    } finally {
+      requestSampleCodeButton.disabled = false;
+    }
+  });
+
   document.getElementById("sample-account-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const email = emailInput?.value || "";
+    const code = sampleCodeInput?.value || "";
 
     if (!isValidEmail(email)) {
       if (status) {
         status.textContent = "Enter a valid email address to start the sample exam.";
       }
       emailInput?.focus();
+      return;
+    }
+
+    if (!String(code || "").replace(/\D/g, "").match(/^\d{6}$/)) {
+      if (status) {
+        status.textContent = "Enter the 6-digit code sent to that email address.";
+      }
+      sampleCodeInput?.focus();
       return;
     }
 
@@ -2199,7 +2289,7 @@ async function initStartPage() {
     const sampleAccess = getSampleAccessStatus(email);
     if (!sampleAccess.allowed) {
       if (status) {
-        status.textContent = "This email has reached the 3 sample exam limit. Use full exam access to continue.";
+        status.textContent = "This email has reached the 4 sample exam limit. Use full exam access to continue.";
       }
       return;
     }
@@ -2211,16 +2301,19 @@ async function initStartPage() {
     }
 
     const savedAccount = saveSampleAccount(email);
+    if (startSampleExamButton) {
+      startSampleExamButton.disabled = true;
+    }
     try {
-      try {
-        await recordSampleExamStart(savedAccount.email);
-      } catch (error) {
-        console.warn("Unable to record sample exam start:", error);
-      }
+      await verifySampleEmailCode(savedAccount.email, code);
       await startNewExam({ mode: "sample", accountEmail: savedAccount.email });
     } catch (error) {
       if (status) {
         status.textContent = error instanceof Error ? error.message : "Unable to start the sample exam.";
+      }
+    } finally {
+      if (startSampleExamButton) {
+        startSampleExamButton.disabled = false;
       }
     }
   });
