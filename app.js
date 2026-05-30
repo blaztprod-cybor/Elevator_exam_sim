@@ -233,6 +233,19 @@ function saveSampleAccessCounts(counts) {
   localStorage.setItem(SAMPLE_ACCESS_COUNTS_KEY, JSON.stringify(counts));
 }
 
+function resetSampleAccessCount(email) {
+  const normalizedEmail = normalizeSampleEmail(email);
+  if (!normalizedEmail) {
+    return;
+  }
+
+  const counts = loadSampleAccessCounts();
+  if (Object.prototype.hasOwnProperty.call(counts, normalizedEmail)) {
+    delete counts[normalizedEmail];
+    saveSampleAccessCounts(counts);
+  }
+}
+
 function getSampleAccessStatus(email) {
   const normalizedEmail = normalizeSampleEmail(email);
   const isUnlimited = normalizedEmail === SAMPLE_ACCESS_UNLIMITED_EMAIL;
@@ -318,6 +331,27 @@ async function recordSampleExamStart(email) {
 
   if (!response.ok) {
     throw new Error(data.error || "Unable to record sample exam start.");
+  }
+
+  return data;
+}
+
+async function syncSampleAccountStatus(email) {
+  const response = await fetch("/api/sample/status", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email: normalizeSampleEmail(email) }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to check sample account status.");
+  }
+
+  if (data.resetSampleLimit) {
+    resetSampleAccessCount(email);
   }
 
   return data;
@@ -2151,6 +2185,12 @@ async function initStartPage() {
       }
       emailInput?.focus();
       return;
+    }
+
+    try {
+      await syncSampleAccountStatus(email);
+    } catch (error) {
+      console.warn("Unable to sync sample account status:", error);
     }
 
     const sampleAccess = getSampleAccessStatus(email);

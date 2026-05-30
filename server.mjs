@@ -315,10 +315,14 @@ async function fetchAccessRows() {
   return parseCsv(await response.text());
 }
 
-async function findAccessRecord(email) {
+async function findAccessRows(email) {
   const normalizedEmail = normalizeEmail(email);
   const rows = await fetchAccessRows();
-  const matchingRows = rows.filter((row) => normalizeEmail(row.email) === normalizedEmail);
+  return rows.filter((row) => normalizeEmail(row.email) === normalizedEmail);
+}
+
+async function findAccessRecord(email) {
+  const matchingRows = await findAccessRows(email);
   return (
     matchingRows.find((row) => {
       const status = String(row.access_status || row.access_status_ || row.accessstatus || "").trim().toUpperCase();
@@ -327,6 +331,10 @@ async function findAccessRecord(email) {
     matchingRows[0] ||
     null
   );
+}
+
+function getRecordAccessStatus(record) {
+  return String(record?.access_status || record?.access_status_ || record?.accessstatus || "").trim().toUpperCase();
 }
 
 function validateAccessRecord(record, phone) {
@@ -530,6 +538,32 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/api/sample/diagnostics", (_req, res) => {
   res.json(getSampleSignupDiagnostics());
+});
+
+app.post("/api/sample/status", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: "Enter a valid email address." });
+      return;
+    }
+
+    const matchingRows = await findAccessRows(email);
+    const hasTrialReset = matchingRows.some((row) => getRecordAccessStatus(row) === "TRIAL_RESET");
+    const hasFullAccess = matchingRows.some((row) => {
+      const status = getRecordAccessStatus(row);
+      return status === "ACTIVE" || status === "FULL";
+    });
+
+    res.json({
+      success: true,
+      email,
+      resetSampleLimit: hasTrialReset || hasFullAccess,
+      hasFullAccess,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to check sample status." });
+  }
 });
 
 app.post("/api/sample/start", async (req, res) => {

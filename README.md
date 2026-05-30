@@ -94,6 +94,14 @@ SAMPLE_SIGNUP_SHARED_SECRET=the same long random password
 
 When a user starts a sample exam, the backend posts the email to Apps Script, which appends a row with `access status` set to `TRIAL`. `TRIAL` rows do not grant full exam access.
 
+To reset a user's local 3-sample limit, add or update that email in the access sheet with:
+
+```text
+access status=TRIAL_RESET
+```
+
+The next time that user enters the same email on the sample form, the app clears the browser-local sample count before starting the trial.
+
 ## Stripe access automation
 
 Use [google-apps-script/stripe-access-webhook.gs](./google-apps-script/stripe-access-webhook.gs) to automatically add successful Stripe Payment Link buyers to the Google Sheet access list.
