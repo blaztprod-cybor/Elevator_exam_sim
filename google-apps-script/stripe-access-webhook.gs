@@ -65,11 +65,18 @@ function doPost(event) {
     const expiresAt = addDaysEndOfDay_(paymentDate, accessDays);
 
     const customerDetails = session.customer_details || {};
+    const email = normalizeEmail_(customerDetails.email || session.customer_email || "");
     const row = {
-      email: customerDetails.email || session.customer_email || "",
+      email,
+      "phone number": customerDetails.phone || "",
       phone: customerDetails.phone || "",
       "access status": "FULL",
       access_status: "FULL",
+      "payment source": "Stripe",
+      payment_source: "Stripe",
+      "payment id": session.id,
+      payment_id: session.id,
+      "payment date": formatDate_(paymentDate),
       payment_date: formatDate_(paymentDate),
       expires_at: formatDate_(expiresAt),
       exam_access_level: "FULL",
@@ -81,8 +88,20 @@ function doPost(event) {
       created_at: now.toISOString(),
     };
 
-    appendMappedRow_(sheet, headers, row);
-    return json_({ received: true, granted: true, email: row.email, expires_at: row.expires_at });
+    const existingEmailRow = findRowByEmail_(sheet, headers, email);
+    if (existingEmailRow) {
+      updateMappedRow_(sheet, headers, existingEmailRow, row);
+    } else {
+      appendMappedRow_(sheet, headers, row);
+    }
+
+    return json_({
+      received: true,
+      granted: true,
+      email: row.email,
+      expires_at: row.expires_at,
+      upgradedExistingRow: Boolean(existingEmailRow),
+    });
   } catch (error) {
     return json_({ received: false, error: error.message || String(error) }, 500);
   }
@@ -190,6 +209,17 @@ function appendMappedRow_(sheet, headers, row) {
   sheet.appendRow(values);
 }
 
+function updateMappedRow_(sheet, headers, rowNumber, row) {
+  const width = headers.length;
+  const range = sheet.getRange(rowNumber, 1, 1, width);
+  const existingValues = range.getValues()[0];
+  const values = headers.map((header, index) => {
+    const value = row[header];
+    return value === undefined || value === null ? existingValues[index] || "" : value;
+  });
+  range.setValues([values]);
+}
+
 function findRowByValue_(sheet, headers, headerName, expectedValue) {
   const columnIndex = headers.indexOf(headerName) + 1;
   if (!columnIndex || sheet.getLastRow() < 2) {
@@ -200,6 +230,22 @@ function findRowByValue_(sheet, headers, headerName, expectedValue) {
   const expected = String(expectedValue || "");
   for (let index = 0; index < values.length; index += 1) {
     if (String(values[index][0] || "") === expected) {
+      return index + 2;
+    }
+  }
+  return 0;
+}
+
+function findRowByEmail_(sheet, headers, email) {
+  const columnIndex = headers.indexOf("email") + 1;
+  if (!columnIndex || sheet.getLastRow() < 2) {
+    return 0;
+  }
+
+  const values = sheet.getRange(2, columnIndex, sheet.getLastRow() - 1, 1).getValues();
+  const expected = normalizeEmail_(email);
+  for (let index = 0; index < values.length; index += 1) {
+    if (normalizeEmail_(values[index][0]) === expected) {
       return index + 2;
     }
   }
@@ -218,14 +264,19 @@ function appendSampleSignup_(payload) {
   const headers = getHeaders_(sheet);
   const now = new Date();
   const startedAt = payload.createdAt ? new Date(payload.createdAt) : now;
+  const existingEmailRow = findRowByEmail_(sheet, headers, email);
+  const existingStatus = existingEmailRow
+    ? String(sheet.getRange(existingEmailRow, headers.indexOf("access status") + 1).getValue() || "").trim().toUpperCase()
+    : "";
+  const shouldKeepPaidStatus = existingStatus === "ACTIVE" || existingStatus === "FULL";
   const row = {
     email,
-    "access status": "TRIAL",
-    access_status: "TRIAL",
-    "payment source": "Sample Exam",
-    payment_source: "Sample Exam",
-    "payment date": formatDate_(startedAt),
-    payment_date: formatDate_(startedAt),
+    "access status": shouldKeepPaidStatus ? undefined : "TRIAL",
+    access_status: shouldKeepPaidStatus ? undefined : "TRIAL",
+    "payment source": shouldKeepPaidStatus ? undefined : "Sample Exam",
+    payment_source: shouldKeepPaidStatus ? undefined : "Sample Exam",
+    "payment date": shouldKeepPaidStatus ? undefined : formatDate_(startedAt),
+    payment_date: shouldKeepPaidStatus ? undefined : formatDate_(startedAt),
     sample_starts: "1",
     last_sample_started_at: startedAt.toISOString(),
     created_at: startedAt.toISOString(),
@@ -234,8 +285,13 @@ function appendSampleSignup_(payload) {
     ip_address: String(payload.ipAddress || ""),
   };
 
-  appendMappedRow_(sheet, headers, row);
-  return json_({ received: true, recorded: true, email });
+  if (existingEmailRow) {
+    updateMappedRow_(sheet, headers, existingEmailRow, row);
+  } else {
+    appendMappedRow_(sheet, headers, row);
+  }
+
+  return json_({ received: true, recorded: true, email, updatedExistingRow: Boolean(existingEmailRow) });
 }
 
 function normalizeEmail_(value) {
