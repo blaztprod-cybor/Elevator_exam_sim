@@ -9,6 +9,7 @@
  *    STRIPE_SECRET_KEY=sk_test_... or sk_live_...
  *    WEBHOOK_SHARED_SECRET=a long random password you choose
  *    ACCESS_DAYS=30
+ *    SPREADSHEET_ID=the access-list spreadsheet id
  *    SHEET_NAME=Access
  * 5. Deploy -> New deployment -> Web app.
  *    Execute as: Me
@@ -125,7 +126,10 @@ function retrieveStripeCheckoutSession_(sessionId) {
 
 function getAccessSheet_() {
   const sheetName = getProperty_("SHEET_NAME") || DEFAULT_SHEET_NAME;
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const spreadsheetId = getProperty_("SPREADSHEET_ID");
+  const spreadsheet = spreadsheetId
+    ? SpreadsheetApp.openById(spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(sheetName);

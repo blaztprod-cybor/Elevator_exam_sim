@@ -77,6 +77,7 @@ Setup:
 
 ```text
 WEBHOOK_SHARED_SECRET=a long random password
+SPREADSHEET_ID=19YlJUvRQh3bVBeymdreehr8hxK_xVZpbDSJ4n8iru5U
 SHEET_NAME=Sheet1
 ```
 
