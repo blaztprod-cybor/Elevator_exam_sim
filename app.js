@@ -306,6 +306,23 @@ async function postAccessGate(path, payload) {
   return data;
 }
 
+async function recordSampleExamStart(email) {
+  const response = await fetch("/api/sample/start", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email: normalizeSampleEmail(email) }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to record sample exam start.");
+  }
+
+  return data;
+}
+
 async function validateFullAccessSession() {
   const session = loadFullAccessSession();
   if (!session) {
@@ -2152,6 +2169,11 @@ async function initStartPage() {
 
     const savedAccount = saveSampleAccount(email);
     try {
+      try {
+        await recordSampleExamStart(savedAccount.email);
+      } catch (error) {
+        console.warn("Unable to record sample exam start:", error);
+      }
       await startNewExam({ mode: "sample", accountEmail: savedAccount.email });
     } catch (error) {
       if (status) {

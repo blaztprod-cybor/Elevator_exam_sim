@@ -46,8 +46,16 @@ const LINKED_BOOKS_PATH = path.join(__dirname, ".linked-books.json");
 const ACCESS_SHEET_URL =
   process.env.ACCESS_SHEET_URL ||
   "https://docs.google.com/spreadsheets/d/19YlJUvRQh3bVBeymdreehr8hxK_xVZpbDSJ4n8iru5U/edit?usp=sharing";
+const SAMPLE_SIGNUP_WEBHOOK_URL = process.env.SAMPLE_SIGNUP_WEBHOOK_URL || "";
+const SAMPLE_SIGNUP_SHARED_SECRET = process.env.SAMPLE_SIGNUP_SHARED_SECRET || "";
 const TEXTBELT_API_KEY = process.env.TEXTBELT_API_KEY || "";
 const TEXTBELT_SENDER = process.env.TEXTBELT_SENDER || "Elevator Exam SIM";
+const ADMIN_ACCESS_EMAILS = new Set(
+  String(process.env.ADMIN_ACCESS_EMAILS || "shawn.raynor@gmail.com")
+    .split(",")
+    .map(normalizeEmail)
+    .filter(Boolean)
+);
 const ACCESS_CODE_TTL_MS = 10 * 60 * 1000;
 const VERIFIED_ACCESS_TTL_MS = 12 * 60 * 60 * 1000;
 const accessCodes = new Map();
@@ -104,6 +112,50 @@ function normalizeUsPhoneNumber(value) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
+}
+
+function getClientIp(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return forwardedFor || req.socket?.remoteAddress || "";
+}
+
+async function recordSampleSignup({ email, userAgent, ipAddress }) {
+  if (!SAMPLE_SIGNUP_WEBHOOK_URL) {
+    return { recorded: false, reason: "sample_signup_webhook_not_configured" };
+  }
+
+  const url = new URL(SAMPLE_SIGNUP_WEBHOOK_URL);
+  if (SAMPLE_SIGNUP_SHARED_SECRET && !url.searchParams.has("secret")) {
+    url.searchParams.set("secret", SAMPLE_SIGNUP_SHARED_SECRET);
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      userAgent,
+      ipAddress,
+      source: "sample_exam_start",
+      createdAt: new Date().toISOString(),
+    }),
+  });
+
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok || data?.received === false) {
+    throw new Error(data?.error || `Sample signup webhook failed with ${response.status}`);
+  }
+
+  return { recorded: true, response: data };
 }
 
 function normalizeSheetUrlToCsv(url) {
@@ -216,13 +268,15 @@ function formatDateOnly(date) {
 function buildAccessInfo(record) {
   const paymentDate = parseSheetDate(record?.payment_date || record?.started_at || record?.start_date);
   const expiresAt = parseSheetDate(record?.expires_at || record?.expires || record?.expiration);
+  const isAdmin = ADMIN_ACCESS_EMAILS.has(normalizeEmail(record?.email));
 
   return {
     accessStatus: String(record?.access_status || record?.access_status_ || record?.accessstatus || "").trim().toUpperCase(),
     paymentDate: paymentDate ? formatDateOnly(paymentDate) : "",
-    expiresAt: expiresAt ? expiresAt.toISOString() : "",
-    expiresDate: expiresAt ? formatDateOnly(expiresAt) : "",
+    expiresAt: isAdmin ? "" : expiresAt ? expiresAt.toISOString() : "",
+    expiresDate: isAdmin ? "Never" : expiresAt ? formatDateOnly(expiresAt) : "",
     examAccessLevel: String(record?.exam_access_level || record?.access_level || "").trim(),
+    isAdmin,
   };
 }
 
@@ -237,7 +291,15 @@ async function fetchAccessRows() {
 async function findAccessRecord(email) {
   const normalizedEmail = normalizeEmail(email);
   const rows = await fetchAccessRows();
-  return rows.find((row) => normalizeEmail(row.email) === normalizedEmail) || null;
+  const matchingRows = rows.filter((row) => normalizeEmail(row.email) === normalizedEmail);
+  return (
+    matchingRows.find((row) => {
+      const status = String(row.access_status || row.access_status_ || row.accessstatus || "").trim().toUpperCase();
+      return status === "ACTIVE" || status === "FULL";
+    }) ||
+    matchingRows[0] ||
+    null
+  );
 }
 
 function validateAccessRecord(record, phone) {
@@ -246,16 +308,17 @@ function validateAccessRecord(record, phone) {
   }
 
   const status = String(record.access_status || record.access_status_ || record.accessstatus || "").trim().toUpperCase();
-  if (status !== "ACTIVE" && status !== "TRIAL") {
+  if (status !== "ACTIVE" && status !== "FULL") {
     return { ok: false, error: "This account is not active." };
   }
 
+  const isAdmin = ADMIN_ACCESS_EMAILS.has(normalizeEmail(record.email));
   const expiresAt = parseSheetDate(record.expires_at || record.expires || record.expiration);
-  if (expiresAt && expiresAt.getTime() < Date.now()) {
+  if (!isAdmin && expiresAt && expiresAt.getTime() < Date.now()) {
     return { ok: false, error: "This 30-day access has expired." };
   }
 
-  const sheetPhone = normalizePhoneDigits(record.phone);
+  const sheetPhone = normalizePhoneDigits(record.phone || record.phone_number || record.phonenumber);
   const submittedPhone = normalizePhoneDigits(phone);
   if (sheetPhone && sheetPhone !== submittedPhone) {
     return { ok: false, error: "The phone number does not match the access list." };
@@ -438,6 +501,31 @@ app.get("/healthz", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/api/sample/start", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: "Enter a valid email address." });
+      return;
+    }
+
+    try {
+      const result = await recordSampleSignup({
+        email,
+        userAgent: String(req.headers["user-agent"] || ""),
+        ipAddress: getClientIp(req),
+      });
+
+      res.json({ success: true, recorded: result.recorded });
+    } catch (error) {
+      console.warn("Unable to record sample signup:", error instanceof Error ? error.message : error);
+      res.json({ success: true, recorded: false });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to start sample exam." });
+  }
+});
+
 app.post("/api/access/request-code", async (req, res) => {
   try {
     pruneAccessMaps();
@@ -464,7 +552,14 @@ app.post("/api/access/request-code", async (req, res) => {
       attemptCount: 0,
     });
 
-    const smsResult = await sendAccessCodeSms({ phone, code });
+    let smsResult;
+    try {
+      smsResult = await sendAccessCodeSms({ phone, code });
+    } catch (error) {
+      accessCodes.delete(key);
+      throw error;
+    }
+
     res.json({
       success: true,
       expiresInSeconds: Math.floor(ACCESS_CODE_TTL_MS / 1000),
@@ -484,7 +579,12 @@ app.post("/api/access/verify-code", async (req, res) => {
     const key = `${email}:${normalizePhoneDigits(phone)}`;
     const pending = accessCodes.get(key);
 
-    if (!pending || pending.expiresAt <= Date.now()) {
+    if (!pending) {
+      res.status(403).json({ error: "Request a new access code before starting the full exam." });
+      return;
+    }
+
+    if (pending.expiresAt <= Date.now()) {
       accessCodes.delete(key);
       res.status(403).json({ error: "The access code expired. Request a new code." });
       return;

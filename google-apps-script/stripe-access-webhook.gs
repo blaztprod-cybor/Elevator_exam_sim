@@ -17,6 +17,10 @@
  *    as a query parameter:
  *    https://script.google.com/macros/s/.../exec?secret=YOUR_WEBHOOK_SHARED_SECRET
  * 7. Subscribe the Stripe endpoint to checkout.session.completed.
+ *
+ * The same deployment can also receive sample exam starts from the Node app:
+ * SAMPLE_SIGNUP_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
+ * SAMPLE_SIGNUP_SHARED_SECRET=YOUR_WEBHOOK_SHARED_SECRET
  */
 
 const DEFAULT_ACCESS_DAYS = 30;
@@ -27,6 +31,10 @@ function doPost(event) {
     assertSharedSecret_(event);
 
     const payload = JSON.parse(event.postData.contents || "{}");
+    if (payload.source === "sample_exam_start") {
+      return appendSampleSignup_(payload);
+    }
+
     if (payload.type !== "checkout.session.completed") {
       return json_({ received: true, ignored: payload.type || "unknown" });
     }
@@ -59,7 +67,8 @@ function doPost(event) {
     const row = {
       email: customerDetails.email || session.customer_email || "",
       phone: customerDetails.phone || "",
-      access_status: "ACTIVE",
+      "access status": "FULL",
+      access_status: "FULL",
       payment_date: formatDate_(paymentDate),
       expires_at: formatDate_(expiresAt),
       exam_access_level: "FULL",
@@ -127,6 +136,12 @@ function getAccessSheet_() {
 function ensureHeaderRow_(sheet) {
   const requiredHeaders = [
     "email",
+    "name",
+    "phone number",
+    "access status",
+    "payment source",
+    "payment id",
+    "payment date",
     "phone",
     "access_status",
     "payment_date",
@@ -138,6 +153,11 @@ function ensureHeaderRow_(sheet) {
     "amount_paid",
     "currency",
     "created_at",
+    "sample_starts",
+    "last_sample_started_at",
+    "source",
+    "user_agent",
+    "ip_address",
   ];
 
   const range = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), requiredHeaders.length));
@@ -180,6 +200,46 @@ function findRowByValue_(sheet, headers, headerName, expectedValue) {
     }
   }
   return 0;
+}
+
+function appendSampleSignup_(payload) {
+  const email = normalizeEmail_(payload.email);
+  if (!isValidEmail_(email)) {
+    throw new Error("A valid email is required.");
+  }
+
+  const sheet = getAccessSheet_();
+  ensureHeaderRow_(sheet);
+
+  const headers = getHeaders_(sheet);
+  const now = new Date();
+  const startedAt = payload.createdAt ? new Date(payload.createdAt) : now;
+  const row = {
+    email,
+    "access status": "TRIAL",
+    access_status: "TRIAL",
+    "payment source": "Sample Exam",
+    payment_source: "Sample Exam",
+    "payment date": formatDate_(startedAt),
+    payment_date: formatDate_(startedAt),
+    sample_starts: "1",
+    last_sample_started_at: startedAt.toISOString(),
+    created_at: startedAt.toISOString(),
+    source: String(payload.source || "sample_exam_start"),
+    user_agent: String(payload.userAgent || ""),
+    ip_address: String(payload.ipAddress || ""),
+  };
+
+  appendMappedRow_(sheet, headers, row);
+  return json_({ received: true, recorded: true, email });
+}
+
+function normalizeEmail_(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isValidEmail_(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail_(value));
 }
 
 function addDaysEndOfDay_(date, days) {

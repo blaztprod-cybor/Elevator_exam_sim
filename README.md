@@ -47,6 +47,8 @@ Set these Railway environment variables:
 TEXTBELT_API_KEY=your Textbelt API key
 TEXTBELT_SENDER=Elevator Exam SIM
 ACCESS_SHEET_URL=your access-list Google Sheet URL
+SAMPLE_SIGNUP_WEBHOOK_URL=your sample signup Apps Script web app URL
+SAMPLE_SIGNUP_SHARED_SECRET=the same secret configured in Apps Script
 HOST=0.0.0.0
 ```
 
@@ -56,10 +58,40 @@ After deployment, test the temporary `*.up.railway.app` URL:
 
 - `start.html` loads.
 - The sample exam starts.
+- Starting a sample exam records the email in the access-list Google Sheet.
 - A full access code request reaches the backend.
 - Reference books show `Choose PDF` and open from browser storage instead of Mac Preview.
 
 Then add `elevatorexamsim.com` and `www.elevatorexamsim.com` as custom domains in Railway, copy the DNS records Railway shows, and add them in Namecheap.
+
+## Sample email capture
+
+Use [google-apps-script/stripe-access-webhook.gs](./google-apps-script/stripe-access-webhook.gs) to append sample exam email starts to the same Google Sheet used by `ACCESS_SHEET_URL`. The same Apps Script web app can handle both Stripe purchases and sample exam starts.
+
+Setup:
+
+1. Open the Google Sheet used by `ACCESS_SHEET_URL`.
+2. Go to `Extensions -> Apps Script`.
+3. Paste `google-apps-script/stripe-access-webhook.gs` into `Code.gs`.
+4. In Apps Script, open `Project Settings -> Script properties` and add:
+
+```text
+WEBHOOK_SHARED_SECRET=a long random password
+SHEET_NAME=Sheet1
+```
+
+5. If you are also using Stripe access automation, add the Stripe script properties listed below.
+6. Deploy as a web app:
+   - Execute as: `Me`
+   - Who has access: `Anyone`
+7. Set the Node app environment variables:
+
+```text
+SAMPLE_SIGNUP_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
+SAMPLE_SIGNUP_SHARED_SECRET=the same long random password
+```
+
+When a user starts a sample exam, the backend posts the email to Apps Script, which appends a row with `access status` set to `TRIAL`. `TRIAL` rows do not grant full exam access.
 
 ## Stripe access automation
 
