@@ -323,18 +323,15 @@ async function findAccessRows(email) {
 
 async function findAccessRecord(email) {
   const matchingRows = await findAccessRows(email);
-  return (
-    matchingRows.find((row) => {
-      const status = String(row.access_status || row.access_status_ || row.accessstatus || "").trim().toUpperCase();
-      return status === "ACTIVE" || status === "FULL";
-    }) ||
-    matchingRows[0] ||
-    null
-  );
+  const newestRows = matchingRows.slice().reverse();
+  return newestRows.find((row) => {
+    const status = getRecordAccessStatus(row);
+    return status === "ACTIVE" || status === "FULL";
+  }) || newestRows[0] || null;
 }
 
 function getRecordAccessStatus(record) {
-  return String(record?.access_status || record?.access_status_ || record?.accessstatus || "").trim().toUpperCase();
+  return String(record?.access_status_ || record?.access_status || record?.accessstatus || "").trim().toUpperCase();
 }
 
 function validateAccessRecord(record, phone) {
@@ -342,7 +339,7 @@ function validateAccessRecord(record, phone) {
     return { ok: false, error: "This email is not on the access list yet." };
   }
 
-  const status = String(record.access_status || record.access_status_ || record.accessstatus || "").trim().toUpperCase();
+  const status = getRecordAccessStatus(record);
   if (status !== "ACTIVE" && status !== "FULL") {
     return { ok: false, error: "This account is not active." };
   }
