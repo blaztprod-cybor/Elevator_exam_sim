@@ -60,6 +60,11 @@ const ACCESS_CODE_TTL_MS = 10 * 60 * 1000;
 const VERIFIED_ACCESS_TTL_MS = 12 * 60 * 60 * 1000;
 const accessCodes = new Map();
 const verifiedAccessTokens = new Map();
+let lastSampleSignupStatus = {
+  at: null,
+  recorded: false,
+  reason: "not_attempted",
+};
 
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -156,6 +161,28 @@ async function recordSampleSignup({ email, userAgent, ipAddress }) {
   }
 
   return { recorded: true, response: data };
+}
+
+function getSampleSignupDiagnostics() {
+  let webhookHost = "";
+  let webhookPathEndsWithExec = false;
+  try {
+    if (SAMPLE_SIGNUP_WEBHOOK_URL) {
+      const url = new URL(SAMPLE_SIGNUP_WEBHOOK_URL);
+      webhookHost = url.host;
+      webhookPathEndsWithExec = url.pathname.endsWith("/exec");
+    }
+  } catch {
+    webhookHost = "invalid_url";
+  }
+
+  return {
+    sampleSignupWebhookConfigured: Boolean(SAMPLE_SIGNUP_WEBHOOK_URL),
+    sampleSignupSharedSecretConfigured: Boolean(SAMPLE_SIGNUP_SHARED_SECRET),
+    webhookHost,
+    webhookPathEndsWithExec,
+    lastSampleSignupStatus,
+  };
 }
 
 function normalizeSheetUrlToCsv(url) {
@@ -501,6 +528,10 @@ app.get("/healthz", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/sample/diagnostics", (_req, res) => {
+  res.json(getSampleSignupDiagnostics());
+});
+
 app.post("/api/sample/start", async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
@@ -516,9 +547,20 @@ app.post("/api/sample/start", async (req, res) => {
         ipAddress: getClientIp(req),
       });
 
+      lastSampleSignupStatus = {
+        at: new Date().toISOString(),
+        recorded: result.recorded,
+        reason: result.recorded ? "recorded" : result.reason || "not_recorded",
+      };
       res.json({ success: true, recorded: result.recorded });
     } catch (error) {
-      console.warn("Unable to record sample signup:", error instanceof Error ? error.message : error);
+      const message = error instanceof Error ? error.message : String(error);
+      lastSampleSignupStatus = {
+        at: new Date().toISOString(),
+        recorded: false,
+        reason: message,
+      };
+      console.warn("Unable to record sample signup:", message);
       res.json({ success: true, recorded: false });
     }
   } catch (error) {
