@@ -586,6 +586,10 @@ app.post("/api/sample/start", async (req, res) => {
         recorded: result.recorded,
         reason: result.recorded ? "recorded" : result.reason || "not_recorded",
       };
+      if (!result.recorded) {
+        res.status(503).json({ error: "Unable to record trial email. Please try again in a moment.", recorded: false });
+        return;
+      }
       res.json({ success: true, recorded: result.recorded });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -595,7 +599,7 @@ app.post("/api/sample/start", async (req, res) => {
         reason: message,
       };
       console.warn("Unable to record sample signup:", message);
-      res.json({ success: true, recorded: false });
+      res.status(502).json({ error: "Unable to record trial email. Please try again in a moment.", recorded: false });
     }
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Unable to start sample exam." });

@@ -332,6 +332,9 @@ async function recordSampleExamStart(email) {
   if (!response.ok) {
     throw new Error(data.error || "Unable to record sample exam start.");
   }
+  if (!data.recorded) {
+    throw new Error("Unable to record trial email. Please try again in a moment.");
+  }
 
   return data;
 }
