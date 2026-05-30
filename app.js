@@ -1483,7 +1483,7 @@ async function startNewExam({ mode = "full", accountEmail = null, accessToken = 
   if (isSample) {
     const sampleAccess = getSampleAccessStatus(accountEmail);
     if (!sampleAccess.allowed) {
-      throw new Error("This email has reached the 4 sample exam limit. Use full exam access to continue.");
+      throw new Error("Trial limit reached for this email. Full exam access is required to continue.");
     }
   }
   const questionCount = isSample ? config.sampleQuestionCount : config.fullQuestionCount;
@@ -2199,7 +2199,7 @@ async function initStartPage() {
     const sampleAccess = getSampleAccessStatus(email);
     if (!sampleAccess.allowed) {
       if (status) {
-        status.textContent = "This email has reached the 4 sample exam limit. Use full exam access to continue.";
+        status.textContent = "Trial limit reached for this email. Full exam access is required to continue.";
       }
       return;
     }
