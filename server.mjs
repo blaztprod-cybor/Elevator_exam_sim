@@ -254,7 +254,10 @@ function parseCsv(text) {
     const cells = parseCsvLine(line);
     return headers.reduce((row, header, index) => {
       if (header) {
-        row[header] = cells[index] || "";
+        const value = cells[index] || "";
+        if (!Object.prototype.hasOwnProperty.call(row, header) || (!row[header] && value)) {
+          row[header] = value;
+        }
       }
       return row;
     }, {});
