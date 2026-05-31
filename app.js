@@ -15,6 +15,7 @@ const SESSION_PDF_RECORD_KEY = "active-codebook";
 const SESSION_PDF_BOOK_PREFIX = "book:";
 const DEFAULT_EXAM_QUESTION_COUNT = 50;
 const DEFAULT_EXAM_DURATION_SECONDS = 10800;
+const DEFAULT_FULL_PASSING_CORRECT_COUNT = 35;
 const DEFAULT_SAMPLE_QUESTION_COUNT = 5;
 const DEFAULT_SAMPLE_DURATION_SECONDS = 1200;
 const REFERENCE_PDF_WINDOW_NAME = "elevator-reference-pdf";
@@ -45,7 +46,7 @@ const books = [
   { title: "ASME A17.1-2004", key: "a17-1", path: "./reference-pdfs/national/ASME-A17-1_2013.pdf", requiresLocalCopy: true },
   { title: "ASME A17.2-2010", key: "a17-2", path: "./reference-pdfs/national/A17-2_2014.pdf", requiresLocalCopy: true },
   { title: "ASME A17.3-2015", key: "a17-3", path: "./reference-pdfs/national/ASME-A17-3_2015.pdf", requiresLocalCopy: true },
-  { title: "ASME A17.5-2004", key: "a17-5", path: "./reference-pdfs/national/ASME - A17 -5_2004.pdf", requiresLocalCopy: true },
+  { title: "ASME A18.1-2005", key: "a18-1", path: "./reference-pdfs/national/ASME-A18-1_2005.pdf", requiresLocalCopy: true },
   { title: "ASME A90.1-2009", key: "asme-a90-1", path: "./reference-pdfs/national/ASME-A90-1-2009.pdf", requiresLocalCopy: true },
   { title: "ASME B20.1-2015", key: "b20-1", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
   { title: "ANSI A10.4-2016", key: "ansi-a10-4", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
@@ -172,6 +173,7 @@ async function loadSessionPdf(bookKey = "") {
 function getConfig() {
   const config = window.ELEVATOR_EXAM_CONFIG || {};
   const fullQuestionCount = Number(config.fullQuestionCount || config.questionCount);
+  const fullPassingCorrectCount = Number(config.fullPassingCorrectCount || config.passingCorrectCount);
   const fullDurationMinutes = Number(config.fullDurationMinutes);
   const sampleQuestionCount = Number(config.sampleQuestionCount);
   const sampleDurationMinutes = Number(config.sampleDurationMinutes);
@@ -181,6 +183,8 @@ function getConfig() {
     questionSources: Array.isArray(config.questionSources) ? config.questionSources : [],
     localQuestionBankUrl: String(config.localQuestionBankUrl || "./question-bank-1000.csv").trim(),
     fullQuestionCount: fullQuestionCount > 0 ? fullQuestionCount : DEFAULT_EXAM_QUESTION_COUNT,
+    fullPassingCorrectCount:
+      fullPassingCorrectCount > 0 ? fullPassingCorrectCount : DEFAULT_FULL_PASSING_CORRECT_COUNT,
     fullDurationSeconds: fullDurationMinutes > 0 ? fullDurationMinutes * 60 : DEFAULT_EXAM_DURATION_SECONDS,
     sampleQuestionCount: sampleQuestionCount > 0 ? sampleQuestionCount : DEFAULT_SAMPLE_QUESTION_COUNT,
     sampleDurationSeconds: sampleDurationMinutes > 0 ? sampleDurationMinutes * 60 : DEFAULT_SAMPLE_DURATION_SECONDS,
@@ -1298,6 +1302,47 @@ function selectQuestionsFromSourceMix(bank, questionCount, sourceMix) {
   return shuffleArray(selected).slice(0, Math.min(questionCount, bank.length));
 }
 
+function selectQuestionsFromExactSourceMix(bank, questionCount, sourceMix, excludedQuestionKeys = new Set()) {
+  if (!sourceMix.length) {
+    const unseenQuestions = bank.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
+    return shuffleArray(unseenQuestions.length ? unseenQuestions : bank).slice(0, Math.min(questionCount, bank.length));
+  }
+
+  const selected = [];
+  const usedIds = new Set();
+
+  sourceMix.forEach((rule) => {
+    const targetCount = Math.max(0, Number(rule.count) || 0);
+    if (!targetCount || selected.length >= questionCount) {
+      return;
+    }
+
+    const remainingCount = Math.min(targetCount, questionCount - selected.length);
+    const matchingQuestions = bank.filter(
+      (question) => !usedIds.has(getQuestionKey(question)) && questionMatchesSourceRule(question, rule)
+    );
+    const unseenMatchingQuestions = matchingQuestions.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
+    const ruleQuestions = shuffleArray(unseenMatchingQuestions.length ? unseenMatchingQuestions : matchingQuestions).slice(
+      0,
+      remainingCount
+    );
+
+    ruleQuestions.forEach((question) => {
+      selected.push(question);
+      usedIds.add(getQuestionKey(question));
+    });
+  });
+
+  if (selected.length < questionCount) {
+    const leftovers = bank.filter((question) => !usedIds.has(getQuestionKey(question)));
+    const unseenLeftovers = leftovers.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
+    const fallbackLeftovers = unseenLeftovers.length ? unseenLeftovers : leftovers;
+    selected.push(...shuffleArray(fallbackLeftovers).slice(0, questionCount - selected.length));
+  }
+
+  return shuffleArray(selected).slice(0, Math.min(questionCount, bank.length));
+}
+
 function selectQuestionsFromWeightedSourceMix(bank, questionCount, sourceMix, excludedQuestionKeys = new Set()) {
   if (!sourceMix.length) {
     const unseenQuestions = bank.filter((question) => !excludedQuestionKeys.has(getQuestionKey(question)));
@@ -1492,7 +1537,7 @@ async function startNewExam({ mode = "full", accountEmail = null, accessToken = 
   const fullQuestionHistory = new Set(isSample ? [] : loadFullQuestionHistory());
   const selectedQuestions = isSample
     ? selectQuestionsFromWeightedSourceMix(questionBank, questionCount, config.sourceMix, sampleQuestionHistory)
-    : selectQuestionsFromWeightedSourceMix(questionBank, questionCount, config.sourceMix, fullQuestionHistory);
+    : selectQuestionsFromExactSourceMix(questionBank, questionCount, config.sourceMix, fullQuestionHistory);
   if (isSample) {
     recordSampleQuestions(selectedQuestions);
     recordSampleAccess(accountEmail);
@@ -1505,6 +1550,7 @@ async function startNewExam({ mode = "full", accountEmail = null, accessToken = 
     mode: isSample ? "sample" : "full",
     questionCount,
     durationSeconds,
+    passingCorrectCount: isSample ? Math.ceil(questionCount * 0.7) : config.fullPassingCorrectCount,
     accountEmail,
     accessToken: isSample ? null : accessToken,
     currentQ: 0,
@@ -2442,6 +2488,8 @@ async function initResultsPage() {
     const correctCount = activeQuestions.filter((question) => state.userAnswers[getQuestionKey(question)] === question.correct).length;
     const incorrectCount = activeQuestions.length - correctCount;
     const unansweredCount = getUnansweredQuestions(state).length;
+    const passingCorrectCount = Number(state.passingCorrectCount) || Math.ceil(activeQuestions.length * 0.7);
+    const passed = correctCount >= passingCorrectCount;
 
     if (modeLabel) {
       modeLabel.textContent = state.mode === "sample" ? "Sample Exam Complete" : "Full Exam Complete";
@@ -2450,6 +2498,9 @@ async function initResultsPage() {
     scoreText.innerHTML = `
       You scored <strong>${state.score}</strong> out of 100 points.
       <br><strong>${correctCount}</strong> correct, <strong>${incorrectCount}</strong> incorrect, <strong>${unansweredCount}</strong> unanswered.
+      <br><strong>${passed ? "Passed" : "Not passed"}</strong> - passing requires ${passingCorrectCount} correct answers (${Math.round(
+        (passingCorrectCount / Math.max(activeQuestions.length, 1)) * 100
+      )}%).
       ${state.expired ? '<br><span style="color:#b03f3f">Time expired</span>' : ""}
     `;
   }
