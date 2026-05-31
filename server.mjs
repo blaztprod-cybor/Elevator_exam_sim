@@ -163,6 +163,44 @@ async function recordSampleSignup({ email, userAgent, ipAddress }) {
   return { recorded: true, response: data };
 }
 
+async function bindFullAccessPhone({ email, phone }) {
+  if (!SAMPLE_SIGNUP_WEBHOOK_URL) {
+    throw new Error("Access sheet webhook is not configured.");
+  }
+
+  const url = new URL(SAMPLE_SIGNUP_WEBHOOK_URL);
+  if (SAMPLE_SIGNUP_SHARED_SECRET && !url.searchParams.has("secret")) {
+    url.searchParams.set("secret", SAMPLE_SIGNUP_SHARED_SECRET);
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      phone,
+      source: "bind_full_access_phone",
+      createdAt: new Date().toISOString(),
+    }),
+  });
+
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok || data?.received === false) {
+    throw new Error(data?.error || `Access phone webhook failed with ${response.status}`);
+  }
+
+  return data;
+}
+
 function getSampleSignupDiagnostics() {
   let webhookHost = "";
   let webhookPathEndsWithExec = false;
@@ -622,6 +660,11 @@ app.post("/api/access/request-code", async (req, res) => {
     if (!accessResult.ok) {
       res.status(403).json({ error: accessResult.error });
       return;
+    }
+
+    const sheetPhone = normalizePhoneDigits(accessRecord.phone || accessRecord.phone_number || accessRecord.phonenumber);
+    if (!sheetPhone) {
+      await bindFullAccessPhone({ email, phone });
     }
 
     const code = createAccessCode();

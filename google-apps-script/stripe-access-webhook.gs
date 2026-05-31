@@ -32,6 +32,10 @@ function doPost(event) {
     assertSharedSecret_(event);
 
     const payload = JSON.parse(event.postData.contents || "{}");
+    if (payload.source === "bind_full_access_phone") {
+      return bindFullAccessPhone_(payload);
+    }
+
     if (payload.source === "sample_exam_start") {
       return appendSampleSignup_(payload);
     }
@@ -54,7 +58,7 @@ function doPost(event) {
     ensureHeaderRow_(sheet);
 
     const headers = getHeaders_(sheet);
-    const existingRow = findRowByValue_(sheet, headers, "stripe_checkout_session_id", session.id);
+    const existingRow = findRowByValue_(sheet, headers, "payment id", session.id);
     if (existingRow) {
       return json_({ received: true, duplicate: true, sessionId: session.id });
     }
@@ -165,22 +169,7 @@ function ensureHeaderRow_(sheet) {
     "payment source",
     "payment id",
     "payment date",
-    "phone",
-    "access_status",
-    "payment_date",
     "expires_at",
-    "exam_access_level",
-    "stripe_checkout_session_id",
-    "stripe_payment_intent",
-    "stripe_customer_id",
-    "amount_paid",
-    "currency",
-    "created_at",
-    "sample_starts",
-    "last_sample_started_at",
-    "source",
-    "user_agent",
-    "ip_address",
   ];
 
   const range = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), requiredHeaders.length));
@@ -294,8 +283,61 @@ function appendSampleSignup_(payload) {
   return json_({ received: true, recorded: true, email, updatedExistingRow: Boolean(existingEmailRow) });
 }
 
+function bindFullAccessPhone_(payload) {
+  const email = normalizeEmail_(payload.email);
+  const phone = normalizePhoneDigits_(payload.phone);
+  if (!isValidEmail_(email)) {
+    throw new Error("A valid email is required.");
+  }
+  if (phone.length !== 10) {
+    throw new Error("A valid 10-digit US phone number is required.");
+  }
+
+  const sheet = getAccessSheet_();
+  ensureHeaderRow_(sheet);
+
+  const headers = getHeaders_(sheet);
+  const rowNumber = findRowByEmail_(sheet, headers, email);
+  if (!rowNumber) {
+    throw new Error("Email is not on the access list.");
+  }
+
+  const statusColumn = headers.indexOf("access status") + 1;
+  const currentStatus = statusColumn
+    ? String(sheet.getRange(rowNumber, statusColumn).getValue() || "").trim().toUpperCase()
+    : "";
+  if (currentStatus !== "ACTIVE" && currentStatus !== "FULL") {
+    throw new Error("Account is not active.");
+  }
+
+  const phoneColumn = headers.indexOf("phone number") + 1;
+  if (!phoneColumn) {
+    throw new Error("phone number column is missing.");
+  }
+
+  const existingPhone = normalizePhoneDigits_(sheet.getRange(rowNumber, phoneColumn).getValue());
+  if (existingPhone && existingPhone !== phone) {
+    throw new Error("The phone number does not match the access list.");
+  }
+
+  updateMappedRow_(sheet, headers, rowNumber, {
+    "phone number": payload.phone || phone,
+    phone,
+  });
+
+  return json_({ received: true, bound: true, email, phone });
+}
+
 function normalizeEmail_(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizePhoneDigits_(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return digits.slice(1);
+  }
+  return digits;
 }
 
 function isValidEmail_(value) {
