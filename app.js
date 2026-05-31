@@ -51,7 +51,6 @@ const books = [
   { title: "ASME B20.1-2015", key: "b20-1", path: "./reference-pdfs/national/asme-b20-1-2015.pdf.pdf", requiresLocalCopy: true },
   { title: "ANSI A10.4-2016", key: "ansi-a10-4", path: "./reference-pdfs/national/ANSI_A10_4_2016.pdf", requiresLocalCopy: true },
   { title: "ICC A117.1-2009", key: "icc-a117-1", path: "./reference-pdfs/national/ICC - A117 -1- 2009 - ADA.pdf", requiresLocalCopy: true },
-  { title: "2014 NYC Construction Codes", key: "nyc-2014-construction-codes", path: "./reference-pdfs/nyc/2014-nyc-construction-codes.pdf", requiresLocalCopy: true },
   { title: "NYC Building Code Chapter 11", key: "nyc-bc-chapter-11", path: "./reference-pdfs/nyc/nyc-building-code-chapter-11.pdf", requiresLocalCopy: true },
   { title: "NYC Building Code Chapter 30", key: "nyc-bc-chapter-30", path: "./reference-pdfs/nyc/nyc-building-code-chapter-30.pdf", requiresLocalCopy: true },
   { title: "NYC Building Code Chapter 33", key: "nyc-chapter-33", path: "./reference-pdfs/nyc/2022BC_Chapter33_Con_DemoSafetyWBwm.pdf", requiresLocalCopy: true },
