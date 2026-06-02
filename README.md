@@ -30,18 +30,18 @@ After deploying, verify PWA support in Chrome DevTools:
 3. Start the sample exam once, select at least one local reference PDF, then reload with DevTools network set to offline.
 4. Confirm `start.html`, the exam pages, the question bank fallback, and the selected reference PDF still open.
 
-## Railway deploy
+## Render deploy
 
-Create a Railway project from this GitHub repo.
+Create a Render Web Service from this GitHub repo.
 
-Use the default Node workflow:
+Use the Node runtime with:
 
 ```sh
-npm install
-npm start
+Build Command: npm install
+Start Command: npm start
 ```
 
-Set these Railway environment variables:
+Set these Render environment variables:
 
 ```text
 TEXTBELT_API_KEY=your Textbelt API key
@@ -49,12 +49,13 @@ TEXTBELT_SENDER=Elevator Exam SIM
 ACCESS_SHEET_URL=your access-list Google Sheet URL
 SAMPLE_SIGNUP_WEBHOOK_URL=your sample signup Apps Script web app URL
 SAMPLE_SIGNUP_SHARED_SECRET=the same secret configured in Apps Script
+STRIPE_PAYMENT_LINK_URL=your live Stripe Payment Link URL
 HOST=0.0.0.0
 ```
 
-Do not set `PORT`; Railway provides it automatically and `server.mjs` reads `process.env.PORT`.
+Do not set `PORT`; Render provides it automatically and `server.mjs` reads `process.env.PORT`.
 
-After deployment, test the temporary `*.up.railway.app` URL:
+After deployment, test the Render `*.onrender.com` URL:
 
 - `start.html` loads.
 - The sample exam starts.
@@ -62,7 +63,7 @@ After deployment, test the temporary `*.up.railway.app` URL:
 - A full access code request reaches the backend.
 - Reference books show `Choose PDF` and open from browser storage instead of Mac Preview.
 
-Then add `elevatorexamsim.com` and `www.elevatorexamsim.com` as custom domains in Railway, copy the DNS records Railway shows, and add them in Namecheap.
+Then add `elevatorexamsim.com` and `www.elevatorexamsim.com` as custom domains in Render, copy the DNS records Render shows, and add them in Namecheap.
 
 ## Sample email capture
 
@@ -130,6 +131,8 @@ https://script.google.com/macros/s/.../exec?secret=YOUR_WEBHOOK_SHARED_SECRET
 ```
 
 7. Subscribe the Stripe endpoint to `checkout.session.completed`.
+
+8. Set `STRIPE_PAYMENT_LINK_URL` in the Node app environment to the live `https://buy.stripe.com/...` Payment Link. Test-mode links that start with `https://buy.stripe.com/test_...` are intentionally disabled in the browser.
 
 When a paid checkout completes, the script verifies the Checkout Session with Stripe, then appends an `ACTIVE` access row with a 30-day expiration.
 

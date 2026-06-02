@@ -322,6 +322,52 @@ async function postAccessGate(path, payload) {
   return data;
 }
 
+async function loadRuntimeConfig() {
+  const staticConfig = window.ELEVATOR_EXAM_CONFIG || {};
+  try {
+    const response = await fetch("/api/runtime-config", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Runtime config unavailable.");
+    }
+    const runtimeConfig = await response.json();
+    return {
+      ...staticConfig,
+      ...runtimeConfig,
+      stripePaymentLinkUrl: runtimeConfig.stripePaymentLinkUrl || staticConfig.stripePaymentLinkUrl || "",
+    };
+  } catch {
+    return staticConfig;
+  }
+}
+
+function isLiveStripePaymentLink(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "https:" && url.hostname === "buy.stripe.com" && !url.pathname.startsWith("/test_");
+  } catch {
+    return false;
+  }
+}
+
+function configureStripePaymentLink(url) {
+  const link = document.getElementById("stripe-payment-link");
+  if (!link) {
+    return;
+  }
+
+  const paymentUrl = String(url || "").trim();
+  if (!isLiveStripePaymentLink(paymentUrl)) {
+    link.removeAttribute("href");
+    link.setAttribute("aria-disabled", "true");
+    link.textContent = "Stripe checkout unavailable";
+    return;
+  }
+
+  link.href = paymentUrl;
+  link.removeAttribute("aria-disabled");
+  link.textContent = "Pay with Stripe";
+}
+
 async function recordSampleExamStart(email) {
   const response = await fetch("/api/sample/start", {
     method: "POST",
@@ -2187,6 +2233,8 @@ function initReviewPage() {
 
 async function initStartPage() {
   await renderPreviewBookSetup();
+  const runtimeConfig = await loadRuntimeConfig();
+  configureStripePaymentLink(runtimeConfig.stripePaymentLinkUrl);
   bindPreExamPdfUpload();
   const account = loadSampleAccount();
   const emailInput = document.getElementById("sample-email");

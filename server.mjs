@@ -43,11 +43,13 @@ const app = express();
 const PORT = Number(process.env.PORT || 4175);
 const HOST = process.env.HOST || "127.0.0.1";
 const LINKED_BOOKS_PATH = path.join(__dirname, ".linked-books.json");
+const START_HTML_PATH = path.join(__dirname, "start.html");
 const ACCESS_SHEET_URL =
   process.env.ACCESS_SHEET_URL ||
   "https://docs.google.com/spreadsheets/d/19YlJUvRQh3bVBeymdreehr8hxK_xVZpbDSJ4n8iru5U/edit?usp=sharing";
 const SAMPLE_SIGNUP_WEBHOOK_URL = process.env.SAMPLE_SIGNUP_WEBHOOK_URL || "";
 const SAMPLE_SIGNUP_SHARED_SECRET = process.env.SAMPLE_SIGNUP_SHARED_SECRET || "";
+const STRIPE_PAYMENT_LINK_URL = process.env.STRIPE_PAYMENT_LINK_URL || "";
 const TEXTBELT_API_KEY = process.env.TEXTBELT_API_KEY || "";
 const TEXTBELT_SENDER = process.env.TEXTBELT_SENDER || "Elevator Exam SIM";
 const ADMIN_ACCESS_EMAILS = new Set(
@@ -67,6 +69,42 @@ let lastSampleSignupStatus = {
 };
 
 app.use(express.json());
+
+function isLiveStripePaymentLinkUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "https:" && url.hostname === "buy.stripe.com" && !url.pathname.startsWith("/test_");
+  } catch {
+    return false;
+  }
+}
+
+function escapeHtmlAttribute(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+app.get("/start.html", async (_req, res) => {
+  try {
+    let html = await fs.readFile(START_HTML_PATH, "utf8");
+    const paymentUrl = String(STRIPE_PAYMENT_LINK_URL || "").trim();
+    const paymentLinkHtml = isLiveStripePaymentLinkUrl(paymentUrl)
+      ? `<a id="stripe-payment-link" class="btn btn-secondary" href="${escapeHtmlAttribute(paymentUrl)}" target="_blank" rel="noopener">Pay with Stripe</a>`
+      : `<a id="stripe-payment-link" class="btn btn-secondary" href="#" target="_blank" rel="noopener" aria-disabled="true">Stripe checkout unavailable</a>`;
+
+    html = html.replace(
+      /<a id="stripe-payment-link" class="btn btn-secondary"[^>]*>.*?<\/a>/,
+      paymentLinkHtml
+    );
+    res.type("html").send(html);
+  } catch (error) {
+    res.status(500).send(error instanceof Error ? error.message : "Unable to load start page");
+  }
+});
+
 app.use(express.static(__dirname));
 
 const allowedRoots = [
@@ -576,6 +614,12 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/api/sample/diagnostics", (_req, res) => {
   res.json(getSampleSignupDiagnostics());
+});
+
+app.get("/api/runtime-config", (_req, res) => {
+  res.json({
+    stripePaymentLinkUrl: STRIPE_PAYMENT_LINK_URL,
+  });
 });
 
 app.post("/api/sample/status", async (req, res) => {

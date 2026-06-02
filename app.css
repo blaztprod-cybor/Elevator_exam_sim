@@ -86,6 +86,12 @@ body[data-page="exam"] .shell {
   color: var(--ink);
 }
 
+.btn[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 .btn-danger {
   background: var(--danger);
   color: #fff;

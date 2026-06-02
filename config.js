@@ -45,6 +45,7 @@ window.ELEVATOR_EXAM_CONFIG = {
     },
   ],
   localQuestionBankUrl: "./question-bank-1000.csv",
+  stripePaymentLinkUrl: "",
   fullQuestionCount: 50,
   fullPassingCorrectCount: 35,
   fullDurationMinutes: 180,
