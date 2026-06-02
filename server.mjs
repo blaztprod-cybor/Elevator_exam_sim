@@ -648,6 +648,51 @@ app.post("/api/sample/status", async (req, res) => {
   }
 });
 
+app.post("/api/access/status", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: "Enter a valid email address." });
+      return;
+    }
+
+    const accessRecord = await findAccessRecord(email);
+    if (!accessRecord) {
+      res.json({
+        success: true,
+        email,
+        paid: false,
+        access: null,
+        message: "No paid access found for this email.",
+      });
+      return;
+    }
+
+    const status = getRecordAccessStatus(accessRecord);
+    const accessInfo = buildAccessInfo(accessRecord);
+    const isActiveStatus = status === "ACTIVE" || status === "FULL";
+    const expiresAt = parseSheetDate(accessRecord.expires_at || accessRecord.expires || accessRecord.expiration);
+    const isAdmin = ADMIN_ACCESS_EMAILS.has(normalizeEmail(accessRecord.email));
+    const isExpired = !isAdmin && expiresAt && expiresAt.getTime() < Date.now();
+
+    res.json({
+      success: true,
+      email,
+      paid: isActiveStatus,
+      active: isActiveStatus && !isExpired,
+      expired: Boolean(isExpired),
+      access: isActiveStatus ? accessInfo : null,
+      message: isActiveStatus
+        ? isExpired
+          ? "Paid access has expired."
+          : "Paid access is active."
+        : "No active paid access found for this email.",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to check access status." });
+  }
+});
+
 app.post("/api/sample/start", async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);

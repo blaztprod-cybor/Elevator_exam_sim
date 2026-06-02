@@ -409,6 +409,40 @@ async function syncSampleAccountStatus(email) {
   return data;
 }
 
+async function checkFullAccessStatus(email) {
+  const response = await fetch("/api/access/status", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email: normalizeSampleEmail(email) }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to check payment status.");
+  }
+
+  return data;
+}
+
+function formatAccessStatusMessage(status) {
+  if (!status?.paid) {
+    return status?.message || "No paid access found for this email.";
+  }
+
+  const access = status.access || {};
+  if (status.expired) {
+    return access.expiresDate
+      ? `Paid access expired on ${access.expiresDate}.`
+      : "Paid access has expired.";
+  }
+
+  return access.expiresDate
+    ? `Paid access active until ${access.expiresDate}.`
+    : "Paid access is active.";
+}
+
 async function validateFullAccessSession() {
   const session = loadFullAccessSession();
   if (!session) {
@@ -2245,9 +2279,50 @@ async function initStartPage() {
   const accessCodeInput = document.getElementById("access-code");
   const accessStatus = document.getElementById("access-gate-status");
   const startSampleExamButton = document.getElementById("start-sample-exam");
+  const checkStatusButton = document.getElementById("check-access-status");
   const requestCodeButton = document.getElementById("request-access-code");
   const verifyCodeButton = document.getElementById("verify-access-code");
   const fullAccessSession = loadFullAccessSession();
+  let accessStatusRequestId = 0;
+
+  const refreshAccessStatus = async ({ showChecking = false } = {}) => {
+    const email = accessEmailInput?.value || "";
+    if (!isValidEmail(email)) {
+      renderAccessExpiration(null);
+      return null;
+    }
+
+    const requestId = ++accessStatusRequestId;
+    if (showChecking && accessStatus) {
+      accessStatus.dataset.tone = "";
+      accessStatus.textContent = "Checking payment status...";
+    }
+
+    try {
+      const statusResult = await checkFullAccessStatus(email);
+      if (requestId !== accessStatusRequestId) {
+        return null;
+      }
+
+      if (accessStatus) {
+        accessStatus.dataset.tone = statusResult.active ? "success" : "";
+        accessStatus.textContent = formatAccessStatusMessage(statusResult);
+      }
+      renderAccessExpiration(statusResult.access);
+      return statusResult;
+    } catch (error) {
+      if (requestId !== accessStatusRequestId) {
+        return null;
+      }
+
+      if (accessStatus) {
+        accessStatus.dataset.tone = "";
+        accessStatus.textContent = error instanceof Error ? error.message : "Unable to check payment status.";
+      }
+      renderAccessExpiration(null);
+      return null;
+    }
+  };
 
   if (account?.email && emailInput) {
     emailInput.value = account.email;
@@ -2270,7 +2345,31 @@ async function initStartPage() {
     }
     renderAccessExpiration(fullAccessSession.access);
     validateFullAccessSession().catch(() => {});
+  } else if (account?.email && accessEmailInput) {
+    refreshAccessStatus().catch(() => {});
   }
+
+  accessEmailInput?.addEventListener("blur", () => {
+    refreshAccessStatus({ showChecking: true }).catch(() => {});
+  });
+
+  checkStatusButton?.addEventListener("click", async () => {
+    if (!isValidEmail(accessEmailInput?.value || "")) {
+      if (accessStatus) {
+        accessStatus.dataset.tone = "";
+        accessStatus.textContent = "Enter the email address used for payment.";
+      }
+      accessEmailInput?.focus();
+      return;
+    }
+
+    checkStatusButton.disabled = true;
+    try {
+      await refreshAccessStatus({ showChecking: true });
+    } finally {
+      checkStatusButton.disabled = false;
+    }
+  });
 
   document.getElementById("sample-account-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
