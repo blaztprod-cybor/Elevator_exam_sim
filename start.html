@@ -29,7 +29,12 @@
             <button id="start-sample-exam" class="btn btn-primary" type="submit">Start Sample Exam</button>
           </div>
           <p class="form-helper">Enter an email address to start the sample exam. Unsubscribed emails are limited to 4 sample exams.</p>
+          <p class="form-helper">This browser remembers the last email used on this device until you log out.</p>
           <p id="sample-account-status" class="form-status" aria-live="polite"></p>
+          <div class="account-actions">
+            <button id="refresh-account-status" class="btn btn-secondary" type="button">Refresh Status</button>
+            <button id="clear-saved-account" class="btn btn-danger" type="button">Log Out</button>
+          </div>
         </form>
         <form id="full-access-form" class="sample-account-form access-gate-form">
           <div>
@@ -39,7 +44,7 @@
           <div class="payment-link-row" aria-label="Payment options">
             <a id="stripe-payment-link" class="btn btn-secondary" href="#" target="_blank" rel="noopener" aria-disabled="true">Pay with Stripe</a>
           </div>
-          <p class="form-helper">After payment, use the same email and phone here to request your access code.</p>
+          <p class="form-helper">After payment, a paid access record is created for your email address. Use the same email and phone here to request your access code.</p>
           <label for="access-email">Email address</label>
           <div class="access-grid">
             <input id="access-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
@@ -52,7 +57,7 @@
             <input id="access-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
             <button id="verify-access-code" class="btn btn-primary" type="submit">Start Full Exam</button>
           </div>
-          <p class="form-helper">Use the email and phone from the access list. Codes expire in 10 minutes.</p>
+          <p class="form-helper">Use the email and phone from the paid access record. Codes expire in 10 minutes. Log out on shared devices to remove the saved email.</p>
           <div id="access-expiration-panel" class="access-expiration-panel" hidden>
             <span id="access-start-date"></span>
             <span id="access-expiration-date"></span>

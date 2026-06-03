@@ -222,6 +222,10 @@ function loadSampleAccount() {
   }
 }
 
+function clearSampleAccount() {
+  localStorage.removeItem(SAMPLE_ACCOUNT_KEY);
+}
+
 function loadSampleAccessCounts() {
   try {
     const raw = localStorage.getItem(SAMPLE_ACCESS_COUNTS_KEY);
@@ -303,6 +307,11 @@ function loadFullAccessSession() {
     localStorage.removeItem(FULL_ACCESS_KEY);
     return null;
   }
+}
+
+function clearFullAccessSession() {
+  localStorage.removeItem(FULL_ACCESS_KEY);
+  renderAccessExpiration(null);
 }
 
 async function postAccessGate(path, payload) {
@@ -441,6 +450,29 @@ function formatAccessStatusMessage(status) {
   return access.expiresDate
     ? `Paid access active until ${access.expiresDate}.`
     : "Paid access is active.";
+}
+
+function formatSampleAccountMessage(email, sampleStatus, accessStatus) {
+  const normalizedEmail = normalizeSampleEmail(email);
+  const sampleAccess = getSampleAccessStatus(normalizedEmail);
+
+  if (accessStatus?.active) {
+    return accessStatus.access?.expiresDate
+      ? `Saved email ${normalizedEmail}. Paid access is active until ${accessStatus.access.expiresDate}.`
+      : `Saved email ${normalizedEmail}. Paid access is active.`;
+  }
+
+  if (sampleStatus?.hasFullAccess) {
+    return `Saved email ${normalizedEmail}. Paid access was found for this email. Enter the phone number to request an access code.`;
+  }
+
+  if (sampleAccess.isUnlimited) {
+    return `Saved email ${normalizedEmail}. Trial access is available.`;
+  }
+
+  return `Saved email ${normalizedEmail}. Trial access available with ${sampleAccess.remaining} sample exam${
+    sampleAccess.remaining === 1 ? "" : "s"
+  } remaining on this device.`;
 }
 
 async function validateFullAccessSession() {
@@ -2282,6 +2314,8 @@ async function initStartPage() {
   const checkStatusButton = document.getElementById("check-access-status");
   const requestCodeButton = document.getElementById("request-access-code");
   const verifyCodeButton = document.getElementById("verify-access-code");
+  const refreshAccountButton = document.getElementById("refresh-account-status");
+  const clearSavedAccountButton = document.getElementById("clear-saved-account");
   const fullAccessSession = loadFullAccessSession();
   let accessStatusRequestId = 0;
 
@@ -2324,6 +2358,67 @@ async function initStartPage() {
     }
   };
 
+  const refreshSavedAccountStatus = async ({ showChecking = false } = {}) => {
+    const email = normalizeSampleEmail(emailInput?.value || accessEmailInput?.value || "");
+    if (!isValidEmail(email)) {
+      if (status) {
+        status.dataset.tone = "";
+        status.textContent = "";
+      }
+      return null;
+    }
+
+    if (showChecking && status) {
+      status.dataset.tone = "";
+      status.textContent = "Refreshing account status...";
+    }
+
+    let sampleStatus = null;
+    let fullStatus = null;
+
+    try {
+      sampleStatus = await syncSampleAccountStatus(email);
+    } catch (error) {
+      if (status) {
+        status.dataset.tone = "";
+        status.textContent = error instanceof Error ? error.message : "Unable to refresh trial status.";
+      }
+      return null;
+    }
+
+    try {
+      fullStatus = await checkFullAccessStatus(email);
+    } catch (error) {
+      if (accessStatus) {
+        accessStatus.dataset.tone = "";
+        accessStatus.textContent = error instanceof Error ? error.message : "Unable to check payment status.";
+      }
+    }
+
+    saveSampleAccount(email);
+    if (emailInput) {
+      emailInput.value = email;
+    }
+    if (accessEmailInput) {
+      accessEmailInput.value = email;
+    }
+
+    if (status) {
+      status.dataset.tone = fullStatus?.active ? "success" : "";
+      status.textContent = formatSampleAccountMessage(email, sampleStatus, fullStatus);
+    }
+
+    if (fullStatus) {
+      if (accessStatus) {
+        accessStatus.dataset.tone = fullStatus.active ? "success" : "";
+        accessStatus.textContent = formatAccessStatusMessage(fullStatus);
+      }
+      renderAccessExpiration(fullStatus.access);
+    }
+
+    return { sampleStatus, fullStatus };
+  };
+
   if (account?.email && emailInput) {
     emailInput.value = account.email;
   }
@@ -2349,8 +2444,52 @@ async function initStartPage() {
     refreshAccessStatus().catch(() => {});
   }
 
+  if (account?.email) {
+    refreshSavedAccountStatus().catch(() => {});
+  }
+
+  emailInput?.addEventListener("blur", () => {
+    if (emailInput.value) {
+      refreshSavedAccountStatus({ showChecking: true }).catch(() => {});
+    }
+  });
+
   accessEmailInput?.addEventListener("blur", () => {
     refreshAccessStatus({ showChecking: true }).catch(() => {});
+  });
+
+  refreshAccountButton?.addEventListener("click", async () => {
+    refreshAccountButton.disabled = true;
+    try {
+      await refreshSavedAccountStatus({ showChecking: true });
+    } finally {
+      refreshAccountButton.disabled = false;
+    }
+  });
+
+  clearSavedAccountButton?.addEventListener("click", () => {
+    clearSampleAccount();
+    clearFullAccessSession();
+    if (emailInput) {
+      emailInput.value = "";
+    }
+    if (accessEmailInput) {
+      accessEmailInput.value = "";
+    }
+    if (accessPhoneInput) {
+      accessPhoneInput.value = "";
+    }
+    if (accessCodeInput) {
+      accessCodeInput.value = "";
+    }
+    if (status) {
+      status.dataset.tone = "";
+      status.textContent = "Saved account removed from this browser.";
+    }
+    if (accessStatus) {
+      accessStatus.dataset.tone = "";
+      accessStatus.textContent = "";
+    }
   });
 
   checkStatusButton?.addEventListener("click", async () => {
@@ -2499,6 +2638,10 @@ async function initStartPage() {
       if (accessStatus) {
         accessStatus.dataset.tone = "success";
         accessStatus.textContent = "Access verified. Loading full exam...";
+      }
+      if (status) {
+        status.dataset.tone = "success";
+        status.textContent = formatSampleAccountMessage(session.email, { hasFullAccess: true }, verified);
       }
       await startNewExam({ mode: "full", accountEmail: session.email, accessToken: session.accessToken });
     } catch (error) {
