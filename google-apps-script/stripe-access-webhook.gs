@@ -85,6 +85,7 @@ function doPost(event) {
       payment_date: formatDate_(paymentDate),
       expires_at: formatDate_(expiresAt),
       exam_access_level: "FULL",
+      stripe_event_id: String(payload.id || ""),
       stripe_checkout_session_id: session.id,
       stripe_payment_intent: session.payment_intent || "",
       stripe_customer_id: session.customer || "",
@@ -191,6 +192,7 @@ function ensureHeaderRow_(sheet) {
     "payment id",
     "payment date",
     "expires_at",
+    "stripe_event_id",
   ];
 
   const range = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), requiredHeaders.length));
