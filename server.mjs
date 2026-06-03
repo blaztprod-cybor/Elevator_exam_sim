@@ -267,7 +267,7 @@ function normalizeSheetUrlToCsv(url) {
     return "";
   }
 
-  if (input.includes("/gviz/tq") || input.includes("output=csv")) {
+  if (input.includes("/gviz/tq") || input.includes("output=csv") || input.includes("format=csv")) {
     return input;
   }
 
@@ -277,7 +277,28 @@ function normalizeSheetUrlToCsv(url) {
   }
 
   const sheetId = match[1];
-  const gid = input.match(/[?&]gid=([0-9]+)/)?.[1] || "0";
+  let gid = "0";
+  let sheetName = "";
+
+  try {
+    const parsed = new URL(input);
+    gid = parsed.searchParams.get("gid") || gid;
+    sheetName = String(parsed.searchParams.get("sheet") || "").trim();
+
+    const hashParams = new URLSearchParams(String(parsed.hash || "").replace(/^#/, ""));
+    gid = hashParams.get("gid") || gid;
+    if (!sheetName) {
+      sheetName = String(hashParams.get("sheet") || "").trim();
+    }
+  } catch {
+    gid = input.match(/[?&]gid=([0-9]+)/)?.[1] || input.match(/#gid=([0-9]+)/)?.[1] || gid;
+    sheetName = decodeURIComponent(input.match(/[?&]sheet=([^&#]+)/)?.[1] || "").trim();
+  }
+
+  if (sheetName) {
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  }
+
   return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
 }
 

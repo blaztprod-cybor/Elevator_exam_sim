@@ -49,7 +49,7 @@ function doPost(event) {
       throw new Error("Missing Stripe checkout session id.");
     }
 
-    const session = retrieveStripeCheckoutSession_(sessionId);
+    const session = resolveStripeCheckoutSession_(payload);
     if (session.payment_status !== "paid") {
       return json_({ received: true, ignored: "payment_not_paid", sessionId });
     }
@@ -72,6 +72,7 @@ function doPost(event) {
     const email = normalizeEmail_(customerDetails.email || session.customer_email || "");
     const row = {
       email,
+      name: customerDetails.name || "",
       "phone number": customerDetails.phone || "",
       phone: customerDetails.phone || "",
       "access status": "ACTIVE",
@@ -107,8 +108,28 @@ function doPost(event) {
       upgradedExistingRow: Boolean(existingEmailRow),
     });
   } catch (error) {
+    console.error("Stripe access webhook failed", error);
     return json_({ received: false, error: error.message || String(error) }, 500);
   }
+}
+
+function resolveStripeCheckoutSession_(payload) {
+  const session = payload && payload.data && payload.data.object;
+  if (!session || typeof session !== "object") {
+    throw new Error("Missing Stripe checkout session payload.");
+  }
+
+  // Stripe already sends the checkout session in the webhook body. Use it directly
+  // so paid access can still be granted if a follow-up Stripe API lookup is unavailable.
+  if (session.object === "checkout.session" && session.payment_status) {
+    return session;
+  }
+
+  if (!session.id) {
+    throw new Error("Missing Stripe checkout session id.");
+  }
+
+  return retrieveStripeCheckoutSession_(session.id);
 }
 
 function assertSharedSecret_(event) {
