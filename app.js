@@ -438,9 +438,16 @@ function formatAccessStatusMessage(status) {
       : "Paid access has expired.";
   }
 
-  return access.expiresDate
-    ? `Paid access active until ${access.expiresDate}.`
-    : "Paid access is active.";
+  if (access.expiresAt) {
+    const expiresAt = new Date(access.expiresAt);
+    if (!Number.isNaN(expiresAt.getTime())) {
+      const remainingMs = expiresAt.getTime() - Date.now();
+      const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+      return `${remainingDays} day${remainingDays === 1 ? "" : "s"} access remaining.`;
+    }
+  }
+
+  return access.expiresDate ? `Paid access active until ${access.expiresDate}.` : "Paid access is active.";
 }
 
 function formatSampleAccountMessage(email, sampleStatus, accessStatus) {
@@ -2302,7 +2309,6 @@ async function initStartPage() {
   const accessCodeInput = document.getElementById("access-code");
   const accessStatus = document.getElementById("access-gate-status");
   const startSampleExamButton = document.getElementById("start-sample-exam");
-  const checkStatusButton = document.getElementById("check-access-status");
   const requestCodeButton = document.getElementById("request-access-code");
   const verifyCodeButton = document.getElementById("verify-access-code");
   const fullAccessSession = loadFullAccessSession();
@@ -2445,24 +2451,6 @@ async function initStartPage() {
 
   accessEmailInput?.addEventListener("blur", () => {
     refreshAccessStatus({ showChecking: true }).catch(() => {});
-  });
-
-  checkStatusButton?.addEventListener("click", async () => {
-    if (!isValidEmail(accessEmailInput?.value || "")) {
-      if (accessStatus) {
-        accessStatus.dataset.tone = "";
-        accessStatus.textContent = "Enter the email address used for payment.";
-      }
-      accessEmailInput?.focus();
-      return;
-    }
-
-    checkStatusButton.disabled = true;
-    try {
-      await refreshAccessStatus({ showChecking: true });
-    } finally {
-      checkStatusButton.disabled = false;
-    }
   });
 
   document.getElementById("sample-account-form")?.addEventListener("submit", async (event) => {
