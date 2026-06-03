@@ -173,9 +173,15 @@ function ensureHeaderRow_(sheet) {
   ];
 
   const range = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), requiredHeaders.length));
-  const existingHeaders = range.getValues()[0].map(String);
+  const existingHeaders = range.getValues()[0].map((value) => String(value || "").trim());
   if (existingHeaders.some(Boolean)) {
-    const nextHeaders = existingHeaders.slice();
+    const nextHeaders = requiredHeaders.slice();
+    existingHeaders.forEach((header) => {
+      if (header && !nextHeaders.includes(header)) {
+        nextHeaders.push(header);
+      }
+    });
+    sheet.getRange(1, 1, 1, sheet.getMaxColumns()).clearContent();
     requiredHeaders.forEach((header) => {
       if (!nextHeaders.includes(header)) {
         nextHeaders.push(header);
@@ -190,7 +196,11 @@ function ensureHeaderRow_(sheet) {
 
 function getHeaders_(sheet) {
   const width = sheet.getLastColumn();
-  return sheet.getRange(1, 1, 1, width).getValues()[0].map(String);
+  return sheet
+    .getRange(1, 1, 1, width)
+    .getValues()[0]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
 }
 
 function appendMappedRow_(sheet, headers, row) {
