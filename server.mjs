@@ -844,7 +844,7 @@ app.post("/api/access/request-code", async (req, res) => {
       return;
     }
 
-    const sheetPhone = normalizePhoneDigits(accessRecord.phone || accessRecord.phone_number || accessRecord.phonenumber);
+await bindFullAccessPhone({ email, phone });
     if (!sheetPhone) {
       await bindFullAccessPhone({ email, phone });
     }
