@@ -204,13 +204,13 @@ function saveSampleAccount(email) {
     email: normalizeSampleEmail(email),
     createdAt: Date.now(),
   };
-  localStorage.setItem(SAMPLE_ACCOUNT_KEY, JSON.stringify(account));
+  sessionStorage.setItem(SAMPLE_ACCOUNT_KEY, JSON.stringify(account));
   return account;
 }
 
 function loadSampleAccount() {
   try {
-    const raw = localStorage.getItem(SAMPLE_ACCOUNT_KEY);
+    const raw = sessionStorage.getItem(SAMPLE_ACCOUNT_KEY);
     if (!raw) {
       return null;
     }
@@ -220,10 +220,6 @@ function loadSampleAccount() {
   } catch {
     return null;
   }
-}
-
-function clearSampleAccount() {
-  localStorage.removeItem(SAMPLE_ACCOUNT_KEY);
 }
 
 function loadSampleAccessCounts() {
@@ -288,30 +284,25 @@ function saveFullAccessSession({ email, phone, accessToken, expiresInSeconds, ac
     expiresAt: Date.now() + Math.max(0, Number(expiresInSeconds) || 0) * 1000,
     access: access || null,
   };
-  localStorage.setItem(FULL_ACCESS_KEY, JSON.stringify(session));
+  sessionStorage.setItem(FULL_ACCESS_KEY, JSON.stringify(session));
   return session;
 }
 
 function loadFullAccessSession() {
   try {
-    const raw = localStorage.getItem(FULL_ACCESS_KEY);
+    const raw = sessionStorage.getItem(FULL_ACCESS_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
 
     if (!parsed?.accessToken || !parsed?.email || Number(parsed.expiresAt || 0) <= Date.now()) {
-      localStorage.removeItem(FULL_ACCESS_KEY);
+      sessionStorage.removeItem(FULL_ACCESS_KEY);
       return null;
     }
 
     return parsed;
   } catch {
-    localStorage.removeItem(FULL_ACCESS_KEY);
+    sessionStorage.removeItem(FULL_ACCESS_KEY);
     return null;
   }
-}
-
-function clearFullAccessSession() {
-  localStorage.removeItem(FULL_ACCESS_KEY);
-  renderAccessExpiration(null);
 }
 
 async function postAccessGate(path, payload) {
@@ -490,7 +481,7 @@ async function validateFullAccessSession() {
       email: validated.email || session.email,
       access: validated.access || session.access || null,
     };
-    localStorage.setItem(FULL_ACCESS_KEY, JSON.stringify(nextSession));
+    sessionStorage.setItem(FULL_ACCESS_KEY, JSON.stringify(nextSession));
     renderAccessExpiration(nextSession.access);
     return nextSession;
   } catch {
@@ -499,7 +490,7 @@ async function validateFullAccessSession() {
       return session;
     }
 
-    localStorage.removeItem(FULL_ACCESS_KEY);
+    sessionStorage.removeItem(FULL_ACCESS_KEY);
     renderAccessExpiration(null);
     return null;
   }
@@ -2314,8 +2305,6 @@ async function initStartPage() {
   const checkStatusButton = document.getElementById("check-access-status");
   const requestCodeButton = document.getElementById("request-access-code");
   const verifyCodeButton = document.getElementById("verify-access-code");
-  const refreshAccountButton = document.getElementById("refresh-account-status");
-  const clearSavedAccountButton = document.getElementById("clear-saved-account");
   const fullAccessSession = loadFullAccessSession();
   let accessStatusRequestId = 0;
 
@@ -2456,40 +2445,6 @@ async function initStartPage() {
 
   accessEmailInput?.addEventListener("blur", () => {
     refreshAccessStatus({ showChecking: true }).catch(() => {});
-  });
-
-  refreshAccountButton?.addEventListener("click", async () => {
-    refreshAccountButton.disabled = true;
-    try {
-      await refreshSavedAccountStatus({ showChecking: true });
-    } finally {
-      refreshAccountButton.disabled = false;
-    }
-  });
-
-  clearSavedAccountButton?.addEventListener("click", () => {
-    clearSampleAccount();
-    clearFullAccessSession();
-    if (emailInput) {
-      emailInput.value = "";
-    }
-    if (accessEmailInput) {
-      accessEmailInput.value = "";
-    }
-    if (accessPhoneInput) {
-      accessPhoneInput.value = "";
-    }
-    if (accessCodeInput) {
-      accessCodeInput.value = "";
-    }
-    if (status) {
-      status.dataset.tone = "";
-      status.textContent = "Saved account removed from this browser.";
-    }
-    if (accessStatus) {
-      accessStatus.dataset.tone = "";
-      accessStatus.textContent = "";
-    }
   });
 
   checkStatusButton?.addEventListener("click", async () => {

@@ -30,9 +30,6 @@
           </div>
           <p class="form-helper">Enter an email address to start the sample exam. Unsubscribed emails are limited to 4 sample exams.</p>
           <p id="sample-account-status" class="form-status" aria-live="polite"></p>
-          <div class="account-actions">
-            <button id="clear-saved-account" class="btn btn-danger" type="button">Log Out</button>
-          </div>
         </form>
         <form id="full-access-form" class="sample-account-form access-gate-form">
           <div>
@@ -55,7 +52,7 @@
             <input id="access-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
             <button id="verify-access-code" class="btn btn-primary" type="submit">Start Full Exam</button>
           </div>
-          <p class="form-helper">Use the email and phone from the paid access record. Codes expire in 10 minutes. Log out on shared devices to remove the saved email.</p>
+          <p class="form-helper">Use the email and phone from the paid access record. Codes expire in 10 minutes.</p>
           <div id="access-expiration-panel" class="access-expiration-panel" hidden>
             <span id="access-start-date"></span>
             <span id="access-expiration-date"></span>

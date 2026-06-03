@@ -349,16 +349,6 @@ body[data-page="exam"] .shell {
   color: var(--success);
 }
 
-.account-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.account-actions .btn {
-  min-height: 44px;
-}
-
 .access-expiration-panel {
   display: grid;
   gap: 4px;
@@ -1177,7 +1167,6 @@ body.reference-open .exam-layout {
   .email-entry,
   .payment-link-row,
   .access-grid,
-  .account-actions,
   .book-setup-row {
     grid-template-columns: 1fr;
     display: grid;
