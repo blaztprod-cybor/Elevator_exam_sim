@@ -838,16 +838,15 @@ app.post("/api/access/request-code", async (req, res) => {
     }
 
     const accessRecord = await findAccessRecord(email);
-    const accessRecord = await findAccessRecord(email);
-const accessResult = validateAccessRecord(accessRecord, phone);
-if (!accessResult.ok) {
-  res.status(403).json({ error: accessResult.error });
-  return;
-}
+    const accessResult = validateAccessRecord(accessRecord, phone);
+    if (!accessResult.ok) {
+      res.status(403).json({ error: accessResult.error });
+      return;
+    }
 
-await bindFullAccessPhone({ email, phone });
+    await bindFullAccessPhone({ email, phone });
 
-const code = createAccessCode();
+    const code = createAccessCode();
     const key = `${email}:${normalizePhoneDigits(phone)}`;
     accessCodes.set(key, {
       codeHash: hashAccessCode({ email, phone, code }),
@@ -905,6 +904,8 @@ app.post("/api/access/verify-code", async (req, res) => {
       res.status(403).json({ error: accessResult.error });
       return;
     }
+
+    await bindFullAccessPhone({ email, phone });
 
     accessCodes.delete(key);
     const token = crypto.randomBytes(32).toString("hex");
