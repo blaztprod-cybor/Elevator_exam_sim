@@ -239,6 +239,39 @@ async function bindFullAccessPhone({ email, phone }) {
   return data;
 }
 
+async function forwardStripeCheckoutEvent(eventPayload) {
+  if (!SAMPLE_SIGNUP_WEBHOOK_URL) {
+    throw new Error("Access sheet webhook is not configured.");
+  }
+
+  const url = new URL(SAMPLE_SIGNUP_WEBHOOK_URL);
+  if (SAMPLE_SIGNUP_SHARED_SECRET && !url.searchParams.has("secret")) {
+    url.searchParams.set("secret", SAMPLE_SIGNUP_SHARED_SECRET);
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(eventPayload),
+  });
+
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok || data?.received === false) {
+    throw new Error(data?.error || `Stripe access webhook forward failed with ${response.status}`);
+  }
+
+  return data;
+}
+
 function getSampleSignupDiagnostics() {
   let webhookHost = "";
   let webhookPathEndsWithExec = false;
@@ -641,6 +674,45 @@ app.get("/api/runtime-config", (_req, res) => {
   res.json({
     stripePaymentLinkUrl: STRIPE_PAYMENT_LINK_URL,
   });
+});
+
+app.post("/api/stripe/webhook", async (req, res) => {
+  try {
+    const payload = req.body;
+    if (!payload || typeof payload !== "object") {
+      res.status(400).json({ error: "Invalid Stripe event payload." });
+      return;
+    }
+
+    const eventType = String(payload.type || "").trim();
+    if (eventType !== "checkout.session.completed") {
+      res.json({ received: true, ignored: eventType || "unknown" });
+      return;
+    }
+
+    const session = payload?.data?.object;
+    if (!session || typeof session !== "object") {
+      res.status(400).json({ error: "Missing checkout session payload." });
+      return;
+    }
+
+    if (String(session.payment_status || "").trim().toLowerCase() !== "paid") {
+      res.json({ received: true, ignored: "payment_not_paid" });
+      return;
+    }
+
+    const forwarded = await forwardStripeCheckoutEvent(payload);
+    res.json({
+      received: true,
+      forwarded: true,
+      eventId: String(payload.id || ""),
+      sessionId: String(session.id || ""),
+      result: forwarded,
+    });
+  } catch (error) {
+    console.error("Unable to process Stripe webhook:", error);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to process Stripe webhook." });
+  }
 });
 
 app.post("/api/sample/status", async (req, res) => {
