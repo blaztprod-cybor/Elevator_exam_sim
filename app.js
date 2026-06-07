@@ -1618,8 +1618,11 @@ function showIncompleteSubmitWarning(state) {
     warning.innerHTML = `
       <strong>This test is not complete.</strong>
       <span>You have ${unanswered.length} unanswered question${unanswered.length === 1 ? "" : "s"}: ${unansweredList}.</span>
-      <a href="./review.html">Go to review</a>
+      <button id="submit-warning-review" type="button" class="submit-warning-action">Go to review</button>
     `;
+    warning.querySelector("#submit-warning-review")?.addEventListener("click", () => {
+      navigateWithinExamApp("./review.html");
+    });
     warning.scrollIntoView({ block: "nearest" });
   }
 
@@ -1696,6 +1699,46 @@ function ensureExamState() {
     return null;
   }
   return state;
+}
+
+function navigateWithinExamApp(path, { fallbackToHistory = false } = {}) {
+  const currentUrl = window.location.href;
+  const targetUrl = new URL(path, currentUrl).href;
+
+  if (targetUrl === currentUrl) {
+    return;
+  }
+
+  try {
+    window.location.assign(targetUrl);
+  } catch {
+    if (fallbackToHistory && window.history.length > 1) {
+      window.history.back();
+    }
+    return;
+  }
+
+  if (!fallbackToHistory) {
+    return;
+  }
+
+  window.setTimeout(() => {
+    if (window.location.href === currentUrl && window.history.length > 1) {
+      window.history.back();
+    }
+  }, 250);
+}
+
+function bindNavigationButton(id, path, options) {
+  const button = document.getElementById(id);
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateWithinExamApp(path, options);
+  });
 }
 
 function renderQuestion(state) {
@@ -1795,8 +1838,18 @@ function renderReviewListPage(state) {
       <div class="review-empty">
         <p class="eyebrow">Review Complete</p>
         <p class="muted">There are no unanswered or marked questions left.</p>
+        <div class="review-empty-actions">
+          <button id="review-submit-exam" type="button" class="btn btn-primary">Submit Exam</button>
+          <button id="review-return-exam" type="button" class="btn btn-secondary">Back To Exam</button>
+        </div>
       </div>
     `;
+    container.querySelector("#review-submit-exam")?.addEventListener("click", () => {
+      submitExam();
+    });
+    container.querySelector("#review-return-exam")?.addEventListener("click", () => {
+      navigateWithinExamApp("./exam.html", { fallbackToHistory: true });
+    });
     return;
   }
 
@@ -2292,6 +2345,7 @@ function initReviewPage() {
     return;
   }
 
+  bindNavigationButton("back-to-exam", "./exam.html", { fallbackToHistory: true });
   renderReviewListPage(state);
 }
 
@@ -2635,6 +2689,8 @@ async function initExamPage() {
   const markReviewButton = document.getElementById("mark-review");
   const nextButton = document.getElementById("next-question");
   const submitButton = document.getElementById("submit-exam");
+
+  bindNavigationButton("go-to-review", "./review.html");
 
   const syncTimer = () => {
     state = loadState();

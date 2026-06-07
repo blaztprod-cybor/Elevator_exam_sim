@@ -836,11 +836,16 @@ body.reference-open .exam-layout {
   display: none;
 }
 
-.submit-warning a {
+.submit-warning-action {
   width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-weight: 800;
   color: var(--danger);
   text-decoration: underline;
+  cursor: pointer;
 }
 
 .question-card {
@@ -937,6 +942,14 @@ body.reference-open .exam-layout {
   border: 1px dashed var(--line);
   background: rgba(255, 255, 255, 0.62);
   text-align: center;
+}
+
+.review-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .review-tile {
